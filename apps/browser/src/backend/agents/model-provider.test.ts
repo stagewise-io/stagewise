@@ -99,7 +99,13 @@ function customEndpointToInstance(ep: CustomEndpoint): ProviderInstance {
 }
 
 function createTestModelProviderService({
-  providerModes = {},
+  providerModes = {
+    openai: 'official',
+    anthropic: 'official',
+    google: 'official',
+    deepseek: 'official',
+    'z-ai': 'official',
+  },
   connectedCodingPlanIds = {},
   modelThinkingOverrides = {},
   customEndpoints = [],
@@ -201,13 +207,15 @@ function createTestModelProviderService({
   }
 
   preferences.providerInstances = instances;
+  preferences.agent.modelThinkingOverrides = Object.fromEntries(
+    instances.map((instance) => [instance.id, modelThinkingOverrides]),
+  );
 
   return new ModelProviderService(
     {
       withTracing: vi.fn((model) => model),
       captureException: vi.fn(),
     } as any,
-    { accessToken: 'stagewise-token' } as any,
     {
       get: vi.fn(() => preferences),
       decryptProviderApiKey: vi.fn(() => 'provider-api-key'),
@@ -961,7 +969,7 @@ describe('custom model provider instance routing', () => {
 });
 
 describe('legacy Stagewise custom model routing', () => {
-  it('keeps a migrated custom model on Stagewise when vendor BYOK exists', () => {
+  it('rejects a retired custom-model instance even when vendor BYOK exists', () => {
     const service = createTestModelProviderService({
       providerModes: { openai: 'official' },
     });
@@ -976,24 +984,12 @@ describe('legacy Stagewise custom model routing', () => {
       contextWindowSize: 128_000,
     });
 
-    const result = service.getModelWithOptions(
-      'legacy-stagewise-custom',
-      'trace-1',
-    );
-
-    expect((result.model as any).modelId).toBe(
-      'openai/legacy-stagewise-custom',
-    );
-    expect(
-      (service as any).preferencesService.decryptProviderApiKey,
-    ).not.toHaveBeenCalled();
-    expect(result.reasoningSignatureSource).toMatchObject({
-      providerMode: 'custom',
-      provider: 'openai',
-    });
+    expect(() =>
+      service.getModelWithOptions('legacy-stagewise-custom', 'trace-1'),
+    ).toThrow('Provider instance stagewise-default not found');
   });
 
-  it('resolves a custom model through the unpersisted Stagewise sentinel', () => {
+  it('rejects a custom model referencing a retired instance', () => {
     const service = createTestModelProviderService();
     const preferences = (service as any).preferencesService.get();
     preferences.customModels.push({
@@ -1008,29 +1004,23 @@ describe('legacy Stagewise custom model routing', () => {
 
     expect(
       service.modelExists('legacy-stagewise-custom', 'stagewise-default'),
-    ).toBe(true);
-    const result = service.getModelWithOptions(
-      'legacy-stagewise-custom',
-      'trace-1',
-      undefined,
-      'stagewise-default',
-    );
-
-    expect((result.model as any).modelId).toBe(
-      'openai/legacy-stagewise-custom',
-    );
-    expect(result.reasoningSignatureSource).toMatchObject({
-      providerMode: 'custom',
-      provider: 'openai',
-    });
+    ).toBe(false);
+    expect(() =>
+      service.getModelWithOptions(
+        'legacy-stagewise-custom',
+        'trace-1',
+        undefined,
+        'stagewise-default',
+      ),
+    ).toThrow('Provider instance stagewise-default not found');
   });
 });
 
 describe('deleted provider instance recovery', () => {
-  it('preserves the legacy Stagewise sentinel without a persisted instance', () => {
+  it('rejects the retired managed-provider sentinel', () => {
     const service = createTestModelProviderService();
 
-    expect(service.modelExists('gpt-5.5', 'stagewise-default')).toBe(true);
+    expect(service.modelExists('gpt-5.5', 'stagewise-default')).toBe(false);
     expect(() =>
       service.getModelWithOptions(
         'gpt-5.5',
@@ -1038,7 +1028,7 @@ describe('deleted provider instance recovery', () => {
         undefined,
         'stagewise-default',
       ),
-    ).not.toThrow();
+    ).toThrow('Provider instance stagewise-default not found');
   });
 
   it.each([
@@ -1099,9 +1089,9 @@ describe('model alias routing', () => {
 
     expect(result.contextWindowSize).toBeGreaterThan(0);
     expect(result.reasoningSignatureSource).toMatchObject({
-      providerMode: 'stagewise',
+      providerMode: 'official',
       provider,
-      modelId: `${provider}/${targetModelId}`,
+      modelId: expect.stringContaining(targetModelId),
     });
   });
 
@@ -1880,7 +1870,7 @@ describe('thinking override provider option resolution', () => {
     });
   });
 
-  it('maps Stagewise-routed Anthropic overrides to Anthropic options', () => {
+  it('maps externally routed Anthropic overrides to Anthropic options', () => {
     const service = createTestModelProviderService({
       modelThinkingOverrides: { 'claude-opus-4.8': { value: 'max' } },
     });

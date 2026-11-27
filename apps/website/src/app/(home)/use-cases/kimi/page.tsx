@@ -9,19 +9,19 @@ export const metadata: Metadata = {
   title:
     'An Open-Source IDE & Coding Agent with First-Class Kimi Support · stagewise',
   description:
-    "stagewise is an open-source IDE and coding agent with first-class support for Kimi K3, K2.7 Code, K2.6, and K2.5 from Moonshot AI. Kimi K3 is Moonshot's most capable flagship model, with 2.8T parameters, a 1M-token context, native visual understanding, and thinking mode always enabled. Run via stagewise Cloud Inference, your own Moonshot API key, or local inference.",
+    "stagewise is an open-source IDE and coding agent with first-class support for Kimi K3, K2.7 Code, K2.6, and K2.5 from Moonshot AI. Kimi K3 is Moonshot's most capable flagship model, with 2.8T parameters, a 1M-token context, native visual understanding, and thinking mode always enabled. Run via your own Moonshot API key, or local inference.",
   openGraph: {
     title:
       'An Open-Source IDE & Coding Agent with First-Class Kimi Support · stagewise',
     description:
-      "stagewise is an open-source IDE and coding agent with first-class support for Kimi K3, K2.7 Code, K2.6, and K2.5 from Moonshot AI. Kimi K3 is Moonshot's most capable flagship model, with 2.8T parameters, a 1M-token context, native visual understanding, and thinking mode always enabled. Run via stagewise Cloud Inference, your own Moonshot API key, or local inference.",
+      "stagewise is an open-source IDE and coding agent with first-class support for Kimi K3, K2.7 Code, K2.6, and K2.5 from Moonshot AI. Kimi K3 is Moonshot's most capable flagship model, with 2.8T parameters, a 1M-token context, native visual understanding, and thinking mode always enabled. Run via your own Moonshot API key, or local inference.",
     type: 'website',
   },
   twitter: {
     title:
       'An Open-Source IDE & Coding Agent with First-Class Kimi Support · stagewise',
     description:
-      "stagewise is an open-source IDE and coding agent with first-class support for Kimi K3, K2.7 Code, K2.6, and K2.5 from Moonshot AI. Kimi K3 is Moonshot's most capable flagship model, with 2.8T parameters, a 1M-token context, native visual understanding, and thinking mode always enabled. Run via stagewise Cloud Inference, your own Moonshot API key, or local inference.",
+      "stagewise is an open-source IDE and coding agent with first-class support for Kimi K3, K2.7 Code, K2.6, and K2.5 from Moonshot AI. Kimi K3 is Moonshot's most capable flagship model, with 2.8T parameters, a 1M-token context, native visual understanding, and thinking mode always enabled. Run via your own Moonshot API key, or local inference.",
     creator: '@stagewise_io',
   },
   alternates: {
@@ -338,21 +338,11 @@ export default function KimiUseCasePage() {
             <ScrollReveal>
               <div className="prose dark:prose-invert prose-p:my-0 prose-headings:mt-6 prose-headings:mb-4 max-w-none [&>p+p]:mt-5">
                 <h2 className="font-medium text-foreground text-xl">
-                  Use Kimi through a stagewise Account, your Moonshot API key,
-                  or local inference
+                  Use Kimi through your Moonshot API key, or local inference
                 </h2>
                 <p>
-                  The default{' '}
-                  <Link
-                    href="/pricing"
-                    className="text-primary underline-offset-4 hover:underline"
-                  >
-                    <strong>stagewise Cloud Inference</strong>
-                  </Link>{' '}
-                  is the easiest way to get started: with a stagewise Account,
-                  you get preconfigured access to Kimi models alongside a wide
-                  range of other models, all without managing a separate API
-                  key.
+                  Connect your Moonshot subscription or API key in Models &
+                  Providers settings to use Kimi.
                 </p>
                 <p>
                   If you want to use Kimi with your own setup, you can supply
@@ -441,23 +431,11 @@ export default function KimiUseCasePage() {
           {
             question: 'How can I use Kimi in stagewise?',
             plainTextAnswer:
-              'You can run Kimi in stagewise using three options: 1. stagewise Cloud Inference: With a stagewise Account, you get preconfigured access to a wide variety of models including Kimi K3, Kimi K2.7 Code, Kimi K2.6, and Kimi K2.5 — no keys, configuration, or external subscriptions required. 2. Your API Key: Supply your own Moonshot API key, or use an API aggregator (like OpenRouter or fireworks.ai) to route your queries. 3. Custom Endpoint: Connect stagewise to any custom endpoint — including local servers (Ollama, Llama.cpp), on-premise deployments (vLLM), or enterprise inference providers.',
+              'You can run Kimi in stagewise using two options: 1. Your API Key: Supply your own Moonshot API key, or use an API aggregator (like OpenRouter or fireworks.ai) to route your queries. 2. Custom Endpoint: Connect stagewise to any custom endpoint — including local servers (Ollama, Llama.cpp), on-premise deployments (vLLM), or enterprise inference providers.',
             answer: (
               <>
-                <p>You can run Kimi in stagewise using three options:</p>
+                <p>You can run Kimi in stagewise using two options:</p>
                 <ul className="mt-2 list-disc space-y-2 pl-5">
-                  <li>
-                    <Link
-                      href="/pricing"
-                      className="text-primary underline-offset-4 hover:underline"
-                    >
-                      <strong>stagewise Cloud Inference</strong>
-                    </Link>
-                    : With a stagewise Account, you get preconfigured access to
-                    a wide variety of models including Kimi K3, Kimi K2.7 Code,
-                    Kimi K2.6, and Kimi K2.5 — no keys, configuration, or
-                    external subscriptions <em>required</em>.
-                  </li>
                   <li>
                     <strong>Your API Key:</strong> Supply your own Moonshot API
                     key, or use an API aggregator (like OpenRouter or
@@ -493,7 +471,7 @@ export default function KimiUseCasePage() {
           {
             question: 'Can I use my Moonshot API key with stagewise?',
             plainTextAnswer:
-              'Yes. You can use your existing Moonshot API key with stagewise. Set it up during onboarding, or later in the settings at any time. You can also switch between providers whenever you like — stagewise Cloud Inference, your own Moonshot API key, or local inference — without losing your work or configuration.',
+              'Yes. You can use your existing Moonshot API key with stagewise. Set it up during onboarding, or later in the settings at any time. You can also switch between providers whenever you like — your own Moonshot API key, or local inference — without losing your work or configuration.',
             answer: (
               <>
                 <p>
@@ -506,9 +484,8 @@ export default function KimiUseCasePage() {
                 </p>
                 <p>
                   You can also <strong>switch between providers</strong>{' '}
-                  whenever you like — stagewise Cloud Inference, your own
-                  Moonshot API key, or local inference — without losing your
-                  work or configuration.
+                  whenever you like — your own Moonshot API key, or local
+                  inference — without losing your work or configuration.
                 </p>
               </>
             ),

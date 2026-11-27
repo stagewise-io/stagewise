@@ -75,6 +75,8 @@ import { getAvailableModel } from '@shared/available-models';
 import {
   DEFAULT_INSTANCE_ID,
   findModelSelectorEntry,
+  getSelectableModelEntries,
+  withoutStagewiseInference,
 } from '@shared/provider-instance-helpers';
 import { useChatDraft } from '@ui/hooks/use-chat-draft';
 import type { Content } from '@tiptap/core';
@@ -856,6 +858,22 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
   const fileAttachmentsRef = useRef(fileAttachments);
   fileAttachmentsRef.current = fileAttachments;
 
+  const preferences = useKartonState(
+    useComparingSelector((s) => ({
+      providerInstances: s.preferences.providerInstances,
+      customModels: s.preferences.customModels,
+    })),
+  );
+  // Persisted account sessions do not provide inference. Check only external
+  // model options, including local providers and endpoints without API keys.
+  const needsInferenceSetup = useMemo(
+    () =>
+      getSelectableModelEntries(withoutStagewiseInference(preferences))
+        .length === 0,
+    [preferences],
+  );
+  const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
+
   const canSendMessageRef = useRef(effectiveCanSendMessage);
   canSendMessageRef.current = effectiveCanSendMessage;
 
@@ -1009,6 +1027,10 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
 
   const handleSubmit = useCallback(async () => {
     if (!canSendMessageRef.current) return;
+    if (needsInferenceSetup) {
+      await openSettings({ section: 'models-providers' });
+      return;
+    }
 
     // Read frequently-changing values from refs at call time
     const currentLocalInputState = localInputStateRef.current;
@@ -1165,6 +1187,8 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
       );
     }
   }, [
+    needsInferenceSetup,
+    openSettings,
     sendUserMessage,
     openAgent,
     setChatInputState,
@@ -1216,12 +1240,6 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
     openAgent
       ? s.agents.instances[openAgent]?.state.activeProviderInstanceId
       : null,
-  );
-  const preferences = useKartonState(
-    useComparingSelector((s) => ({
-      providerInstances: s.preferences.providerInstances,
-      customModels: s.preferences.customModels,
-    })),
   );
   const isExternalAgentRuntime = preferences.providerInstances.some(
     (instance) =>
@@ -1912,6 +1930,25 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
 
   return (
     <footer className="z-20 flex shrink-0 flex-col items-stretch gap-1 px-1 pb-1">
+      {needsInferenceSetup && (
+        <div
+          role="status"
+          className="flex flex-col gap-2 rounded-md border border-border bg-surface-1 p-3 text-sm"
+        >
+          <span className="font-medium text-foreground">Set up inference</span>
+          <p className="text-muted-foreground">
+            Connect a provider subscription, API key, or custom endpoint to use
+            the agent. Local models are supported too.
+          </p>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => void openSettings({ section: 'models-providers' })}
+          >
+            Configure inference
+          </Button>
+        </div>
+      )}
       <MessageAttachmentsProvider elements={[]} attachments={fileAttachments}>
         <div
           ref={chatInputContainerRef}

@@ -9,19 +9,19 @@ export const metadata: Metadata = {
   title:
     'An Open-Source IDE & Coding Agent with First-Class GLM Support · stagewise',
   description:
-    'stagewise is an open-source IDE and coding agent with first-class support for GLM 5.2, 5.1, and 5V-Turbo from Z.AI. Run via stagewise Cloud Inference, your own Z.AI API key, or local inference. Near-Claude Opus 4.8 quality at a fraction of the cost.',
+    'stagewise is an open-source IDE and coding agent with first-class support for GLM 5.2, 5.1, and 5V-Turbo from Z.AI. Run via your own Z.AI API key, or local inference. Near-Claude Opus 4.8 quality at a fraction of the cost.',
   openGraph: {
     title:
       'An Open-Source IDE & Coding Agent with First-Class GLM Support · stagewise',
     description:
-      'stagewise is an open-source IDE and coding agent with first-class support for GLM 5.2, 5.1, and 5V-Turbo from Z.AI. Run via stagewise Cloud Inference, your own Z.AI API key, or local inference. Near-Claude Opus 4.8 quality at a fraction of the cost.',
+      'stagewise is an open-source IDE and coding agent with first-class support for GLM 5.2, 5.1, and 5V-Turbo from Z.AI. Run via your own Z.AI API key, or local inference. Near-Claude Opus 4.8 quality at a fraction of the cost.',
     type: 'website',
   },
   twitter: {
     title:
       'An Open-Source IDE & Coding Agent with First-Class GLM Support · stagewise',
     description:
-      'stagewise is an open-source IDE and coding agent with first-class support for GLM 5.2, 5.1, and 5V-Turbo from Z.AI. Run via stagewise Cloud Inference, your own Z.AI API key, or local inference. Near-Claude Opus 4.8 quality at a fraction of the cost.',
+      'stagewise is an open-source IDE and coding agent with first-class support for GLM 5.2, 5.1, and 5V-Turbo from Z.AI. Run via your own Z.AI API key, or local inference. Near-Claude Opus 4.8 quality at a fraction of the cost.',
     creator: '@stagewise_io',
   },
   alternates: {
@@ -257,12 +257,12 @@ export default function GLMUseCasePage() {
             <ScrollReveal>
               <div className="prose dark:prose-invert prose-p:my-0 prose-headings:mt-6 prose-headings:mb-4 max-w-none [&>p+p]:mt-5">
                 <h2 className="font-medium text-foreground text-xl">
-                  Use GLM through a stagewise Account, your own endpoint, or
-                  local inference
+                  Use GLM through your API key, your own endpoint, or local
+                  inference
                 </h2>
                 <p>
-                  You can use GLM 5.2 through a stagewise Account and start
-                  without managing a separate API key.
+                  Connect your Z.AI API key or a compatible endpoint in Models &
+                  Providers settings to use GLM 5.2.
                 </p>
                 <p>
                   If you already have GLM access elsewhere, you can point the
@@ -417,23 +417,11 @@ export default function GLMUseCasePage() {
           {
             question: 'How can I use GLM in stagewise?',
             plainTextAnswer:
-              'You can run GLM in stagewise using three options: 1. stagewise Cloud Inference: With a stagewise Account, you get preconfigured access to a wide variety of models including GLM 5.2, GLM 5.1, and GLM 5V-Turbo — no keys, configuration, or external subscriptions required. 2. Your API Key: Supply your own Z.AI API key, or use an API aggregator (like OpenRouter or fireworks.ai) to route your queries. 3. Custom Endpoint: Connect stagewise to any custom endpoint — including local servers (Ollama, Llama.cpp), on-premise deployments (vLLM), or enterprise inference providers.',
+              'You can run GLM in stagewise using two options: 1. Your API Key: Supply your own Z.AI API key, or use an API aggregator (like OpenRouter or fireworks.ai) to route your queries. 2. Custom Endpoint: Connect stagewise to any custom endpoint — including local servers (Ollama, Llama.cpp), on-premise deployments (vLLM), or enterprise inference providers.',
             answer: (
               <>
-                <p>You can run GLM in stagewise using three options:</p>
+                <p>You can run GLM in stagewise using two options:</p>
                 <ul className="mt-2 list-disc space-y-2 pl-5">
-                  <li>
-                    <Link
-                      href="/pricing"
-                      className="text-primary underline-offset-4 hover:underline"
-                    >
-                      <strong>stagewise Cloud Inference</strong>
-                    </Link>
-                    : With a stagewise Account, you get preconfigured access to
-                    a wide variety of models including GLM 5.2, GLM 5.1, and GLM
-                    5V-Turbo — no keys, configuration, or external subscriptions{' '}
-                    <em>required</em>.
-                  </li>
                   <li>
                     <strong>Your API Key:</strong> Supply your own Z.AI API key,
                     or use an API aggregator (like OpenRouter or fireworks.ai)

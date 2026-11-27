@@ -44,7 +44,6 @@ import type {
   WidgetId,
   DevToolbarOriginSettings,
   ToolApprovalMode,
-  SocialAuthProvider,
   DiscoveredModel,
   ProviderInstanceTypeId,
   ProviderUsageLimits,
@@ -67,8 +66,6 @@ import type {
   RemoveSearchEngineResult,
   ClearBrowsingDataOptions,
   ClearBrowsingDataResult,
-  CurrentUsageResponse,
-  UsageHistoryResponse,
 } from '../pages-api/types';
 import type { CodingPlanId } from '../../coding-plans';
 import type { SettingsRoute } from '../../settings-route';
@@ -1112,21 +1109,6 @@ export type AppState = {
       } | null;
     };
   };
-  userAccount: {
-    status: AuthStatus;
-    machineId?: string;
-    user?: {
-      id: string;
-      email: string;
-    };
-    subscription?: {
-      active: boolean;
-      plan?: string;
-      expiresAt?: string;
-    };
-    tokenExpiresAt?: string;
-    refreshTokenExpiresAt?: string;
-  };
   // Current stagewise app runtime information
   appInfo: {
     baseName: string; // Base name (e.g., 'stagewise-dev', 'stagewise-nightly', 'stagewise').
@@ -1330,12 +1312,6 @@ export type OnboardingCompletionSummary = {
   provider_step_skipped: boolean;
   personalization_changed: boolean;
 };
-
-export type AuthStatus =
-  | 'authenticated'
-  | 'unauthenticated'
-  | 'authentication_invalid'
-  | 'server_unreachable';
 
 export type ApiKeyValidationResult =
   | null
@@ -1583,50 +1559,6 @@ export type KartonContract = {
       clearPendingAppMessage: (agentInstanceId: string) => Promise<void>;
       clearLogChannel: (filename: string) => Promise<void>;
     };
-    userAccount: {
-      sendOtp: (
-        email: string,
-        turnstileToken: string,
-      ) => Promise<{ error?: string }>;
-      verifyOtp: (email: string, code: string) => Promise<{ error?: string }>;
-      signInSocial: (
-        provider: SocialAuthProvider,
-      ) => Promise<{ error?: string }>;
-      signInEmail: () => Promise<{ error?: string }>;
-      refreshStatus: () => Promise<void>;
-      /** Re-fetch subscription/plan info from the server. */
-      refreshSubscription: () => Promise<void>;
-      logout: () => Promise<void>;
-      /** Get current usage stats */
-      getUsageCurrent: () => Promise<CurrentUsageResponse>;
-      /** Get daily usage history breakdown */
-      getUsageHistory: (params: {
-        days?: number;
-      }) => Promise<UsageHistoryResponse>;
-      validateApiKeys: (keys: {
-        anthropic?: string;
-        openai?: string;
-        google?: string;
-        moonshotai?: string;
-        alibaba?: string;
-        deepseek?: string;
-        'z-ai'?: string;
-        minimax?: string;
-        'xiaomi-mimo'?: string;
-        mistral?: string;
-      }) => Promise<{
-        anthropic: ApiKeyValidationResult;
-        openai: ApiKeyValidationResult;
-        google: ApiKeyValidationResult;
-        moonshotai: ApiKeyValidationResult;
-        alibaba: ApiKeyValidationResult;
-        deepseek: ApiKeyValidationResult;
-        'z-ai': ApiKeyValidationResult;
-        minimax: ApiKeyValidationResult;
-        'xiaomi-mimo': ApiKeyValidationResult;
-        mistral: ApiKeyValidationResult;
-      }>;
-    };
     userExperience: {
       devAppPreview: {
         toggleFullScreen: () => Promise<void>;
@@ -1645,11 +1577,7 @@ export type KartonContract = {
           | {
               value: boolean;
               auth?: {
-                auth_method:
-                  | 'stagewise'
-                  | 'api-keys'
-                  | 'coding-plan'
-                  | 'unknown';
+                auth_method: 'api-keys' | 'coding-plan' | 'unknown';
                 provider?: ModelProvider;
                 plan_id?:
                   | 'glm-coding-plan'
@@ -2314,9 +2242,6 @@ export const defaultState: KartonContract['state'] = {
   },
   gitWorktreeRevisions: {},
   toolbox: {},
-  userAccount: {
-    status: 'unauthenticated',
-  },
   appInfo: {
     baseName: __APP_BASE_NAME__,
     name: __APP_NAME__,

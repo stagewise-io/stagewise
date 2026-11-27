@@ -3,7 +3,6 @@ import type {
   ModelProvider,
   PersonalizationThemeId,
   ProviderInstanceTypeId,
-  SocialAuthProvider,
 } from './shared-types';
 
 export type OnboardingStep =
@@ -22,21 +21,14 @@ export type OnboardingProviderIdentity = {
   provider_kind: OnboardingProviderKind;
   plan_id?: CodingPlanId;
 };
-export type OnboardingAuthMethod = 'stagewise' | 'api-keys' | 'coding-plan';
+export type OnboardingAuthMethod = 'api-keys' | 'coding-plan';
 export type OnboardingAuthFailureKind =
   | 'validation-error'
   | 'backend-error'
   | 'network-error'
   | 'unknown-error';
-export type OnboardingOtpFailureKind =
-  | 'backend-error'
-  | 'network-error'
-  | 'turnstile-not-ready'
-  | 'turnstile-solve-failed';
-export type AuthHandoffProvider = SocialAuthProvider | 'email';
 
 export type UIEventProperties = {
-  'account-page-viewed': undefined;
   'chat-new-agent-clicked': {
     source:
       | 'sidebar-top'
@@ -80,7 +72,6 @@ export type UIEventProperties = {
   'element-selection-stopped': { element_selected: boolean };
   'onboarding-started': {
     onboarding_run_id: string;
-    already_authenticated: boolean;
     connected_provider_count: number;
   };
   'onboarding-step-viewed': {
@@ -145,7 +136,7 @@ export type UIEventProperties = {
   };
   'onboarding-auth-method-failed': {
     auth_method: OnboardingAuthMethod;
-    provider?: ModelProvider | AuthHandoffProvider;
+    provider?: ModelProvider;
     plan_id?: CodingPlanId;
     error_kind: OnboardingAuthFailureKind;
   };
@@ -153,43 +144,12 @@ export type UIEventProperties = {
     from: OnboardingAuthMethod;
     to: OnboardingAuthMethod;
   };
-  'onboarding-auth-social-requested': { provider: SocialAuthProvider };
-  'onboarding-auth-social-verified': { provider: SocialAuthProvider };
-  'onboarding-auth-email-handoff-requested': undefined;
-  'onboarding-auth-email-handoff-verified': undefined;
-  'onboarding-auth-otp-failed': { error_kind: OnboardingOtpFailureKind };
-  'onboarding-auth-otp-requested': undefined;
-  'onboarding-auth-otp-verified': undefined;
   'onboarding-auth-provider-disconnected': {
     auth_method: 'api-keys' | 'coding-plan';
     provider: ModelProvider;
     plan_id?: CodingPlanId;
   };
   'onboarding-auth-providers-expanded': { expanded: boolean };
-  'account-auth-social-requested': { provider: SocialAuthProvider };
-  'account-auth-social-verified': { provider: SocialAuthProvider };
-  'account-auth-email-handoff-requested': undefined;
-  'account-auth-email-handoff-verified': undefined;
-  'account-auth-otp-failed': { error_kind: OnboardingOtpFailureKind };
-  'account-auth-otp-requested': undefined;
-  'account-auth-otp-verified': undefined;
-  'account-auth-method-failed': {
-    auth_method: 'stagewise';
-    provider?: AuthHandoffProvider;
-    error_kind: OnboardingAuthFailureKind;
-  };
-  'chat-auth-social-requested': { provider: SocialAuthProvider };
-  'chat-auth-social-verified': { provider: SocialAuthProvider };
-  'chat-auth-email-handoff-requested': undefined;
-  'chat-auth-email-handoff-verified': undefined;
-  'chat-auth-otp-failed': { error_kind: OnboardingOtpFailureKind };
-  'chat-auth-otp-requested': undefined;
-  'chat-auth-otp-verified': undefined;
-  'chat-auth-method-failed': {
-    auth_method: 'stagewise';
-    provider?: AuthHandoffProvider;
-    error_kind: OnboardingAuthFailureKind;
-  };
   'onboarding-demo-slide-clicked': { slide_name: string };
   'settings-opened': undefined;
   'suggestion-clicked': {

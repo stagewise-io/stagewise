@@ -70,7 +70,6 @@ import {
   getSelectableModelEntries,
   getVendorForInstance,
   isModelEntryValid,
-  isStagewiseInferenceAvailable,
   isStagewiseRoutedSelection,
   type ModelSelectorEntry,
   withoutStagewiseInference,
@@ -316,8 +315,6 @@ export const ModelSelect = memo(function ModelSelect({
   const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
   const preferences = useKartonState((s) => s.preferences);
-  const authStatus = useKartonState((s) => s.userAccount.status);
-  const stagewiseAvailable = isStagewiseInferenceAvailable(authStatus);
   const modelThinkingOverrides = useKartonState(
     (s) =>
       s.preferences.agent.modelThinkingOverrides ??
@@ -339,13 +336,10 @@ export const ModelSelect = memo(function ModelSelect({
     return map;
   }, [preferences.providerInstances]);
 
-  // Preferences used to build the selectable model entries. Stagewise
-  // Inference instances are excluded while the user is not signed in —
-  // their models must not appear as choices without a stagewise account.
-  // The unfiltered `preferences` are still used for all writes below.
+  // Exclude retired managed inference routes from model selection.
   const selectionPreferences = useMemo(
-    () => withoutStagewiseInference(preferences, stagewiseAvailable),
-    [preferences, stagewiseAvailable],
+    () => withoutStagewiseInference(preferences),
+    [preferences],
   );
 
   // Build flat model options list from the aggregation utility
@@ -441,12 +435,7 @@ export const ModelSelect = memo(function ModelSelect({
   const presetEntries = useMemo<PresetEntry[]>(() => {
     return modelPresets
       .filter((preset) => {
-        if (stagewiseAvailable) return true;
-        // Selecting a preset activates its main model, so a preset whose
-        // main model routes through Stagewise Inference (or is otherwise
-        // unavailable) would trigger the same failing request as picking
-        // the hidden model directly. Hide such presets while signed out —
-        // the stored preset definitions are preserved untouched.
+        // Preserve stored presets, but hide retired or unavailable routes.
         const mainModel = preset.models[0];
         if (!mainModel) return true;
         if (
@@ -484,13 +473,7 @@ export const ModelSelect = memo(function ModelSelect({
           thinkingLabel,
         };
       });
-  }, [
-    modelPresets,
-    selectableEntries,
-    stagewiseAvailable,
-    selectionPreferences,
-    preferences,
-  ]);
+  }, [modelPresets, selectableEntries, selectionPreferences, preferences]);
 
   const [open, setOpen] = useState(false);
 

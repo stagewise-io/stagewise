@@ -9,19 +9,19 @@ export const metadata: Metadata = {
   title:
     'An Open-Source IDE & Coding Agent with First-Class DeepSeek Support · stagewise',
   description:
-    'stagewise is an open-source IDE and coding agent with first-class support for DeepSeek V4 Pro and V4 Flash. Run via stagewise Cloud Inference, your own API key, or local inference with Ollama — no lock-in.',
+    'stagewise is an open-source IDE and coding agent with first-class support for DeepSeek V4 Pro and V4 Flash. Run via your own API key, or local inference with Ollama — no lock-in.',
   openGraph: {
     title:
       'An Open-Source IDE & Coding Agent with First-Class DeepSeek Support · stagewise',
     description:
-      'stagewise is an open-source IDE and coding agent with first-class support for DeepSeek V4 Pro and V4 Flash. Run via stagewise Cloud Inference, your own API key, or local inference with Ollama — no lock-in.',
+      'stagewise is an open-source IDE and coding agent with first-class support for DeepSeek V4 Pro and V4 Flash. Run via your own API key, or local inference with Ollama — no lock-in.',
     type: 'website',
   },
   twitter: {
     title:
       'An Open-Source IDE & Coding Agent with First-Class DeepSeek Support · stagewise',
     description:
-      'stagewise is an open-source IDE and coding agent with first-class support for DeepSeek V4 Pro and V4 Flash. Run via stagewise Cloud Inference, your own API key, or local inference with Ollama — no lock-in.',
+      'stagewise is an open-source IDE and coding agent with first-class support for DeepSeek V4 Pro and V4 Flash. Run via your own API key, or local inference with Ollama — no lock-in.',
     creator: '@stagewise_io',
   },
   alternates: {
@@ -98,7 +98,7 @@ export default function DeepSeekUseCasePage() {
                 <p className="text-lg text-muted-foreground leading-relaxed">
                   Use DeepSeek V4 Flash and V4 Pro in a local IDE with a capable
                   coding agent, built for long-running work. Run it through a
-                  stagewise Account, your own API setup, or local inference.
+                  your own API setup or local inference.
                 </p>
                 <div className="mt-8">
                   <DownloadButtons />
@@ -195,8 +195,8 @@ export default function DeepSeekUseCasePage() {
             <ScrollReveal>
               <div className="prose dark:prose-invert prose-p:my-0 prose-headings:mt-6 prose-headings:mb-4 max-w-none [&>p+p]:mt-5">
                 <h2 className="font-medium text-foreground text-xl">
-                  Use DeepSeek through a stagewise Account, your own endpoint,
-                  or local inference
+                  Use DeepSeek through your API key, your own endpoint, or local
+                  inference
                 </h2>
                 <p>
                   You can use DeepSeek V4 Flash and V4 Pro through a stagewise
@@ -355,23 +355,11 @@ export default function DeepSeekUseCasePage() {
           {
             question: 'How can I use DeepSeek in stagewise?',
             plainTextAnswer:
-              'You can run DeepSeek in stagewise using three options: 1. stagewise Cloud Inference: With a stagewise Account, you get preconfigured access to a wide variety of models including DeepSeek V4 Pro and V4 Flash — no keys, configuration, or external subscriptions required. 2. Your API Key: Supply a DeepSeek API key, or use an API aggregator (like OpenRouter or fireworks.ai) to route your queries. 3. Custom Endpoint: Connect stagewise to any custom endpoint — including local servers (Ollama, Llama.cpp), on-premise deployments (vLLM), or enterprise inference providers.',
+              'You can run DeepSeek in stagewise using two options: 1. Your API Key: Supply a DeepSeek API key, or use an API aggregator (like OpenRouter or fireworks.ai) to route your queries. 2. Custom Endpoint: Connect stagewise to any custom endpoint — including local servers (Ollama, Llama.cpp), on-premise deployments (vLLM), or enterprise inference providers.',
             answer: (
               <>
-                <p>You can run DeepSeek in stagewise using three options:</p>
+                <p>You can run DeepSeek in stagewise using two options:</p>
                 <ul className="mt-2 list-disc space-y-2 pl-5">
-                  <li>
-                    <Link
-                      href="/pricing"
-                      className="text-primary underline-offset-4 hover:underline"
-                    >
-                      <strong>stagewise Cloud Inference</strong>
-                    </Link>
-                    : With a stagewise Account, you get preconfigured access to
-                    a wide variety of models including DeepSeek V4 Pro and V4
-                    Flash — no keys, configuration, or external subscriptions{' '}
-                    <em>required</em>.
-                  </li>
                   <li>
                     <strong>Your API Key:</strong> Supply a DeepSeek API key, or
                     use an API aggregator (like OpenRouter or fireworks.ai) to

@@ -39,7 +39,6 @@ export function OnboardingWizard() {
   const providerSummaryRef = useRef<ProviderStepSummary | null>(null);
   const personalizationChangedRef = useRef(false);
   const track = useTrack();
-  const authStatus = useKartonState((s) => s.userAccount.status);
   const connectedProviderCount = useKartonState(
     (s) => s.preferences.providerInstances?.length ?? 0,
   );
@@ -66,8 +65,6 @@ export function OnboardingWizard() {
       startedTrackedRef.current = true;
       void track('onboarding-started', {
         onboarding_run_id: onboardingRunId,
-        already_authenticated:
-          authStatus === 'authenticated' || authStatus === 'server_unreachable',
         connected_provider_count: connectedProviderCount,
       });
     }
@@ -86,7 +83,7 @@ export function OnboardingWizard() {
       visit_index: visitCountsRef.current[screen],
       elapsed_ms_since_start: now - runStartedAtRef.current,
     });
-  }, [authStatus, connectedProviderCount, onboardingRunId, screen, track]);
+  }, [connectedProviderCount, onboardingRunId, screen, track]);
 
   const navigate = useCallback(
     (next: OnboardingStep, action: OnboardingNavigationAction) => {

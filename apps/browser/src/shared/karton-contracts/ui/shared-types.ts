@@ -44,9 +44,6 @@ export const modelProviderSchema = z.enum([
 ]);
 export type ModelProvider = z.infer<typeof modelProviderSchema>;
 
-export const socialAuthProviderSchema = z.enum(['google', 'github']);
-export type SocialAuthProvider = z.infer<typeof socialAuthProviderSchema>;
-
 /** Endpoint mode for a provider */
 export const providerEndpointModeSchema = z.enum([
   'stagewise',
@@ -513,9 +510,9 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
   ProviderTypeDisplayInfo
 > = {
   stagewise: {
-    displayName: 'Stagewise Inference',
-    description: 'Managed inference through stagewise subscription',
-    defaultBaseUrl: 'https://llm.stagewise.io',
+    displayName: 'Retired provider',
+    description: 'Legacy route. Configure an external provider instead.',
+    defaultBaseUrl: '',
     credentialType: 'none',
   },
   'codex-stagewise': {

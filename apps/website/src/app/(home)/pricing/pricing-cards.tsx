@@ -145,7 +145,7 @@ function PricingCard({ plan }: { plan: Plan }) {
         </Link>
       ) : (
         <Link
-          href="https://console.stagewise.io"
+          href="/download"
           target="_blank"
           rel="noopener noreferrer"
           className={cn(

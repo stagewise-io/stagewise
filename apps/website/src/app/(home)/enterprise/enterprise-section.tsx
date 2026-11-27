@@ -46,10 +46,7 @@ const VC_LOGOS = [
 const ENTERPRISE_FEATURES = [
   'Regulatory and audit compliance',
   'Global configuration of inference and models',
-  'Access to stagewise Cloud Inference and stagewise Cloud Inference EU',
-  'SSO with OIDC and SAML',
-  'Provisioning with SCIM',
-  'Optional self-hosting of the stagewise Cloud',
+  'Connect your own enterprise inference endpoints',
 ];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

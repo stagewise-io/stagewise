@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
   updatePreferences: vi.fn(),
   markCurrentReleaseNotesSeen: vi.fn(),
   state: {
-    userAccount: { status: 'unauthenticated' },
     preferences: {
       providerInstances: [] as unknown[],
       agent: { enabledGlobalSkillDirs: [] as string[] },
@@ -93,7 +92,6 @@ describe('OnboardingWizard', () => {
     mocks.updatePreferences.mockReset();
     mocks.updatePreferences.mockResolvedValue(undefined);
     mocks.markCurrentReleaseNotesSeen.mockReset();
-    mocks.state.userAccount.status = 'unauthenticated';
     mocks.state.preferences.providerInstances = [];
     mocks.state.globalSkills = [];
     vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(
@@ -142,7 +140,6 @@ describe('OnboardingWizard', () => {
     await waitFor(() => expect(callsFor('onboarding-started')).toHaveLength(1));
     const initialCall = callsFor('onboarding-started')[0];
 
-    mocks.state.userAccount.status = 'authenticated';
     mocks.state.preferences.providerInstances = [
       { id: 'provider-1', typeId: 'openai-api', config: {} },
     ];
@@ -152,7 +149,6 @@ describe('OnboardingWizard', () => {
     expect(initialCall).toEqual([
       'onboarding-started',
       expect.objectContaining({
-        already_authenticated: false,
         connected_provider_count: 0,
       }),
     ]);

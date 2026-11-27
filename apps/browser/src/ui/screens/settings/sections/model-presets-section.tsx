@@ -35,7 +35,6 @@ import {
   getSelectableUtilityModelEntries,
   getVendorForInstance,
   isModelEntryValid,
-  isStagewiseInferenceAvailable,
   isStagewiseRoutedSelection,
   type ModelSelectorEntry,
   withoutStagewiseInference,
@@ -775,8 +774,6 @@ function UtilityModelList({
   description: string;
 }) {
   const preferences = useKartonState((s) => s.preferences);
-  const authStatus = useKartonState((s) => s.userAccount.status);
-  const stagewiseAvailable = isStagewiseInferenceAvailable(authStatus);
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
 
   const modelEntries = preferences.agent.utilityModels[task] ?? [];
@@ -784,8 +781,8 @@ function UtilityModelList({
   // Stagewise Inference is excluded from the selectable entries while
   // the user is not signed in.
   const selectionPreferences = useMemo(
-    () => withoutStagewiseInference(preferences, stagewiseAvailable),
-    [preferences, stagewiseAvailable],
+    () => withoutStagewiseInference(preferences),
+    [preferences],
   );
   const entries = useMemo(
     () => getSelectableUtilityModelEntries(selectionPreferences),
@@ -800,21 +797,16 @@ function UtilityModelList({
   // another provider exposing the same model ID keep them visible.
   const visibleEntries = useMemo(
     () =>
-      stagewiseAvailable
-        ? modelEntries
-        : modelEntries.filter(
-            (entry) =>
-              !isStagewiseRoutedSelection(
-                preferences,
-                entry.providerInstanceId,
-              ) &&
-              isModelEntryValid(
-                selectionPreferences,
-                entry.modelId,
-                entry.providerInstanceId,
-              ),
+      modelEntries.filter(
+        (entry) =>
+          !isStagewiseRoutedSelection(preferences, entry.providerInstanceId) &&
+          isModelEntryValid(
+            selectionPreferences,
+            entry.modelId,
+            entry.providerInstanceId,
           ),
-    [modelEntries, stagewiseAvailable, preferences, selectionPreferences],
+      ),
+    [modelEntries, preferences, selectionPreferences],
   );
 
   const handleChange = useCallback(
@@ -1118,15 +1110,13 @@ function PresetEditorDialog({
 
 export function ModelPresetsSection() {
   const preferences = useKartonState((s) => s.preferences);
-  const authStatus = useKartonState((s) => s.userAccount.status);
-  const stagewiseAvailable = isStagewiseInferenceAvailable(authStatus);
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
 
   // Selection UIs exclude Stagewise Inference while the user is not
   // signed in; writes below still use the unfiltered preferences.
   const selectionPreferences = useMemo(
-    () => withoutStagewiseInference(preferences, stagewiseAvailable),
-    [preferences, stagewiseAvailable],
+    () => withoutStagewiseInference(preferences),
+    [preferences],
   );
 
   const presets = preferences.agent.modelPresets ?? [];

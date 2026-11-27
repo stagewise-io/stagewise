@@ -13,7 +13,6 @@ export {
 
 import { figmaPatCredentialType } from './figma-pat';
 import { googleAiKeyCredentialType } from './google-ai-key';
-import { stagewiseAuthCredentialType } from './stagewise-auth';
 import { vercelPatCredentialType } from './vercel-pat';
 import { githubPatCredentialType } from './github-pat';
 import { supabasePatCredentialType } from './supabase-pat';
@@ -32,7 +31,6 @@ import { posthogPatCredentialType } from './posthog-pat';
 export const credentialTypeRegistry = {
   'figma-pat': figmaPatCredentialType,
   'google-ai-key': googleAiKeyCredentialType,
-  'stagewise-auth': stagewiseAuthCredentialType,
   'vercel-pat': vercelPatCredentialType,
   'github-pat': githubPatCredentialType,
   'supabase-pat': supabasePatCredentialType,

@@ -36,7 +36,6 @@ import type { KartonService } from '@/services/karton';
 import { DisposableService } from '@/services/disposable';
 import type { DiffHistoryService } from '@stagewise/agent-core/diff-history';
 import type { WindowLayoutService } from '@/services/window-layout';
-import type { AuthService } from '@/services/auth';
 import type { TelemetryService } from '@/services/telemetry';
 import type { ModelProviderService } from '@/agents/model-provider';
 import type { CredentialsService } from '@/services/credentials';
@@ -45,7 +44,6 @@ import type { GitService } from '@/services/git';
 import type { HostAgentStateMutations } from '@/services/agent-core-bridge/state/agent-instances';
 import { resolveNewAgentWorkspaceMountPath } from '@/services/agent-manager/workspace-mount-normalization';
 import type { CredentialTypeId } from '@shared/credential-types';
-import { createAuthenticatedClient } from './utils/create-authenticated-client';
 import { createFileDiffHandler } from './utils/sandbox-callbacks';
 import type { AttachmentsService } from '@stagewise/agent-core/attachments';
 import { getProcessTreeSnapshots } from '@/utils/port-utils';
@@ -62,10 +60,7 @@ import {
   getAgentShellLogsDir,
 } from '@/utils/paths';
 import { existsSync, mkdirSync, truncateSync } from 'node:fs';
-import type { ApiClient } from '@stagewise/api-client';
 import { getLintingDiagnostics as getLintingDiagnosticsTool } from './tools/file-modification/get-linting-diagnostics';
-import { listLibraryDocs as listLibraryDocsTool } from './tools/research/list-library-docs';
-import { searchInLibraryDocs as searchInLibraryDocsTool } from './tools/research/search-in-library-docs';
 import {
   makeUniversalTools,
   type AgentManagerToolboxPort,
@@ -122,7 +117,6 @@ export class ToolboxService
   private readonly uiKarton: KartonService;
   private readonly diffHistoryService: DiffHistoryService;
   private readonly windowLayoutService: WindowLayoutService;
-  private readonly authService: AuthService;
   private readonly telemetryService: TelemetryService;
   private readonly filePickerService: FilePickerService;
   private readonly userExperienceService: UserExperienceService;
@@ -170,8 +164,6 @@ export class ToolboxService
       );
     });
   };
-  /** Cached API client - recreated when auth changes */
-  private apiClient: ApiClient | null = null;
 
   public get globalDataPath(): string {
     return getDataRoot();
@@ -476,7 +468,6 @@ export class ToolboxService
     uiKarton: KartonService,
     diffHistoryService: DiffHistoryService,
     windowLayoutService: WindowLayoutService,
-    authService: AuthService,
     telemetryService: TelemetryService,
     filePickerService: FilePickerService,
     userExperienceService: UserExperienceService,
@@ -494,7 +485,6 @@ export class ToolboxService
     this.uiKarton = uiKarton;
     this.diffHistoryService = diffHistoryService;
     this.windowLayoutService = windowLayoutService;
-    this.authService = authService;
     this.telemetryService = telemetryService;
     this.filePickerService = filePickerService;
     this.userExperienceService = userExperienceService;
@@ -513,7 +503,6 @@ export class ToolboxService
     uiKarton: KartonService,
     diffHistoryService: DiffHistoryService,
     windowLayoutService: WindowLayoutService,
-    authService: AuthService,
     telemetryService: TelemetryService,
     filePickerService: FilePickerService,
     userExperienceService: UserExperienceService,
@@ -531,7 +520,6 @@ export class ToolboxService
       uiKarton,
       diffHistoryService,
       windowLayoutService,
-      authService,
       telemetryService,
       filePickerService,
       userExperienceService,
@@ -637,11 +625,8 @@ export class ToolboxService
       case 'copy':
         return this.getUniversalTool(tool, agentInstanceId);
       case 'listLibraryDocs':
-        if (!this.apiClient) return null;
-        return listLibraryDocsTool(this.apiClient);
       case 'searchInLibraryDocs':
-        if (!this.apiClient) return null;
-        return searchInLibraryDocsTool(this.apiClient);
+        return null;
       case 'getLintingDiagnostics': {
         if (!mountedLspServices) return null;
         return getLintingDiagnosticsTool(mountedLspServices);
@@ -1260,34 +1245,6 @@ export class ToolboxService
   }
 
   /**
-   * Get or create an authenticated API client.
-   * Returns null if not authenticated.
-   */
-  private getOrCreateApiClient(): ApiClient | null {
-    const accessToken = this.authService.accessToken;
-    if (!accessToken) {
-      this.apiClient = null;
-      return null;
-    }
-
-    // Create new client if not cached
-    if (!this.apiClient) {
-      try {
-        this.apiClient = createAuthenticatedClient(accessToken);
-      } catch (error) {
-        this.logger.error(
-          '[ToolboxService] Failed to create authenticated client',
-          { error },
-        );
-        this.report(error as Error, 'createApiClient');
-        return null;
-      }
-    }
-
-    return this.apiClient;
-  }
-
-  /**
    * Drain pending tool-produced attachments for the given agent (today:
    * blobs created via the sandbox `API.createAttachment()` side-channel).
    * Returns them as a flat array; clears the pending buffers as a side
@@ -1340,15 +1297,6 @@ export class ToolboxService
       path: m.path,
       permissions: m.permissions,
     }));
-  }
-
-  /**
-   * Refresh the API client (e.g., after auth state changes).
-   * Call this when the auth token is refreshed.
-   */
-  public refreshApiClient(): void {
-    this.apiClient = null;
-    this.apiClient = this.getOrCreateApiClient();
   }
 
   public async finalizePendingEditsForAgent(
@@ -1439,9 +1387,6 @@ export class ToolboxService
       workingDirectory: pluginsDir,
       rgBinaryBasePath: getRipgrepBasePath(),
     });
-
-    // Eagerly initialize the API client if auth is already available
-    this.apiClient = this.getOrCreateApiClient();
 
     this.mountManagerService = await MountManagerService.create(
       this.logger,
@@ -1613,11 +1558,6 @@ export class ToolboxService
           agentInstanceId,
           toolCallIds,
         ),
-    );
-
-    // Use arrow function to preserve `this` binding when called as callback
-    this.authService.registerAuthStateChangeCallback(() =>
-      this.refreshApiClient(),
     );
 
     // Register askUserQuestions procedure handlers
@@ -1927,8 +1867,6 @@ export class ToolboxService
 
     this.unsubPreferenceSync?.();
     this.unsubPreferenceSync = null;
-
-    this.apiClient = null;
 
     // Persist content tabs before any awaited teardown can consume the
     // shutdown budget. Normal tab operations already save, but app shutdown

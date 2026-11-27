@@ -21,14 +21,13 @@ const HOME_FAQ_ITEMS = [
   {
     question: 'Do I need an API key to get started?',
     plainTextAnswer:
-      'No. With a stagewise Account, you get preconfigured access to a wide variety of models through stagewise Cloud Inference — no keys, configuration, or external subscriptions required. You can also bring your own API key or connect a custom endpoint at any time.',
+      'Not necessarily. Connect a supported provider subscription, bring your own API key, or configure a custom or local endpoint.',
     answer: (
       <>
         <p>
-          <strong>No.</strong> With a stagewise Account, you get preconfigured
-          access to a wide variety of models through{' '}
-          <strong>stagewise Cloud Inference</strong> — no keys, configuration,
-          or external subscriptions <em>required</em>.
+          <strong>Not necessarily.</strong> Connect a supported provider
+          subscription, bring your own API key, or configure a custom or local
+          endpoint.
         </p>
         <p>
           You can also bring your own API key or connect a custom endpoint at

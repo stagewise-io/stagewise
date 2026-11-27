@@ -9,19 +9,19 @@ export const metadata: Metadata = {
   title:
     'An Open-Source IDE & Coding Agent with First-Class MiniMax Support · stagewise',
   description:
-    'stagewise is an open-source IDE and coding agent with first-class support for MiniMax M3, M2.7, and M2. MiniMax M3 is state of the art among open-weight models with native vision, with precise instruction following and a low hallucination rate. Run via stagewise Cloud Inference, the MiniMax Token Plan, your own API key, or local inference.',
+    'stagewise is an open-source IDE and coding agent with first-class support for MiniMax M3, M2.7, and M2. MiniMax M3 is state of the art among open-weight models with native vision, with precise instruction following and a low hallucination rate. Run via the MiniMax Token Plan, your own API key, or local inference.',
   openGraph: {
     title:
       'An Open-Source IDE & Coding Agent with First-Class MiniMax Support · stagewise',
     description:
-      'stagewise is an open-source IDE and coding agent with first-class support for MiniMax M3, M2.7, and M2. MiniMax M3 is state of the art among open-weight models with native vision, with precise instruction following and a low hallucination rate. Run via stagewise Cloud Inference, the MiniMax Token Plan, your own API key, or local inference.',
+      'stagewise is an open-source IDE and coding agent with first-class support for MiniMax M3, M2.7, and M2. MiniMax M3 is state of the art among open-weight models with native vision, with precise instruction following and a low hallucination rate. Run via the MiniMax Token Plan, your own API key, or local inference.',
     type: 'website',
   },
   twitter: {
     title:
       'An Open-Source IDE & Coding Agent with First-Class MiniMax Support · stagewise',
     description:
-      'stagewise is an open-source IDE and coding agent with first-class support for MiniMax M3, M2.7, and M2. MiniMax M3 is state of the art among open-weight models with native vision, with precise instruction following and a low hallucination rate. Run via stagewise Cloud Inference, the MiniMax Token Plan, your own API key, or local inference.',
+      'stagewise is an open-source IDE and coding agent with first-class support for MiniMax M3, M2.7, and M2. MiniMax M3 is state of the art among open-weight models with native vision, with precise instruction following and a low hallucination rate. Run via the MiniMax Token Plan, your own API key, or local inference.',
     creator: '@stagewise_io',
   },
   alternates: {
@@ -336,21 +336,12 @@ export default function MiniMaxUseCasePage() {
             <ScrollReveal>
               <div className="prose dark:prose-invert prose-p:my-0 prose-headings:mt-6 prose-headings:mb-4 max-w-none [&>p+p]:mt-5">
                 <h2 className="font-medium text-foreground text-xl">
-                  Use MiniMax through a stagewise Account, the MiniMax Token
-                  Plan, or local inference
+                  Use MiniMax through your API key, the MiniMax Token Plan, or
+                  local inference
                 </h2>
                 <p>
-                  The default{' '}
-                  <Link
-                    href="/pricing"
-                    className="text-primary underline-offset-4 hover:underline"
-                  >
-                    <strong>stagewise Cloud Inference</strong>
-                  </Link>{' '}
-                  is the easiest way to get started: with a stagewise Account,
-                  you get preconfigured access to MiniMax models alongside a
-                  wide range of other models, all without managing a separate
-                  API key.
+                  Connect your MiniMax subscription or API key in Models &
+                  Providers settings to use MiniMax.
                 </p>
                 <p>
                   If you want to get the most out of MiniMax specifically, the{' '}
@@ -463,23 +454,11 @@ export default function MiniMaxUseCasePage() {
           {
             question: 'How can I use MiniMax in stagewise?',
             plainTextAnswer:
-              'You can run MiniMax in stagewise using three options: 1. stagewise Cloud Inference: With a stagewise Account, you get preconfigured access to a wide variety of models including MiniMax M3, MiniMax M2.7, and MiniMax M2 — no keys, configuration, or external subscriptions required. 2. Your API Key: Supply your own MiniMax API key, or use an API aggregator (like OpenRouter or fireworks.ai) to route your queries. 3. Custom Endpoint: Connect stagewise to any custom endpoint — including local servers (Ollama, Llama.cpp), on-premise deployments (vLLM), or enterprise inference providers.',
+              'You can run MiniMax in stagewise using two options: 1. Your API Key: Supply your own MiniMax API key, or use an API aggregator (like OpenRouter or fireworks.ai) to route your queries. 2. Custom Endpoint: Connect stagewise to any custom endpoint — including local servers (Ollama, Llama.cpp), on-premise deployments (vLLM), or enterprise inference providers.',
             answer: (
               <>
-                <p>You can run MiniMax in stagewise using three options:</p>
+                <p>You can run MiniMax in stagewise using two options:</p>
                 <ul className="mt-2 list-disc space-y-2 pl-5">
-                  <li>
-                    <Link
-                      href="/pricing"
-                      className="text-primary underline-offset-4 hover:underline"
-                    >
-                      <strong>stagewise Cloud Inference</strong>
-                    </Link>
-                    : With a stagewise Account, you get preconfigured access to
-                    a wide variety of models including MiniMax M3, MiniMax M2.7,
-                    and MiniMax M2 — no keys, configuration, or external
-                    subscriptions <em>required</em>.
-                  </li>
                   <li>
                     <strong>Your API Key:</strong> Supply your own MiniMax API
                     key, or use an API aggregator (like OpenRouter or
@@ -515,7 +494,7 @@ export default function MiniMaxUseCasePage() {
           {
             question: 'Can I use my MiniMax Token Plan with stagewise?',
             plainTextAnswer:
-              'Yes. The MiniMax Token Plan is fully supported and is the best way to get the most out of MiniMax models. You can set it up during onboarding, or later in the settings at any time. You can also switch between providers whenever you like — stagewise Cloud Inference, the MiniMax Token Plan, your own API key, or local inference — without losing your work or configuration.',
+              'Yes. The MiniMax Token Plan is fully supported and is the best way to get the most out of MiniMax models. You can set it up during onboarding, or later in the settings at any time. You can also switch between providers whenever you like — the MiniMax Token Plan, your own API key, or local inference — without losing your work or configuration.',
             answer: (
               <>
                 <p>
@@ -528,9 +507,9 @@ export default function MiniMaxUseCasePage() {
                 </p>
                 <p>
                   You can also <strong>switch between providers</strong>{' '}
-                  whenever you like — stagewise Cloud Inference, the MiniMax
-                  Token Plan, your own API key, or local inference — without
-                  losing your work or configuration.
+                  whenever you like — the MiniMax Token Plan, your own API key,
+                  or local inference — without losing your work or
+                  configuration.
                 </p>
               </>
             ),

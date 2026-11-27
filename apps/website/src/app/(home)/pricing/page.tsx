@@ -28,68 +28,18 @@ export const metadata: Metadata = {
 export default function PricingPage() {
   const plans = [
     {
-      name: 'Hobby',
+      name: 'stagewise',
       price: 'Free',
       period: '',
       features: [
-        'Limited access to 3 standard models (Default, Quick, Smart)',
-        'Bring Your Own Key (BYOK) for unlimited access and custom models',
+        'Connect supported provider subscriptions',
+        'Bring your own API keys and custom models',
+        'Use local inference and custom endpoints',
+        'Provider usage is billed separately by your provider',
       ],
       cta: 'Start now',
       popular: false,
       useDownloadButton: true,
-    },
-    {
-      name: 'Individual',
-      price: '',
-      period: '',
-      features: [],
-      popular: false,
-      useSecondaryButton: true,
-      variants: [
-        {
-          label: 'Pro',
-          price: '$20',
-          period: '/mo',
-          features: [
-            'Access to all models, including Frontier and Open-Weights',
-            'Extend usage with extra credits',
-            'Run additional models from custom endpoints',
-          ],
-          cta: 'Get Pro',
-          href: 'https://console.stagewise.io',
-        },
-        {
-          label: 'Ultra',
-          price: '$200',
-          period: '/mo',
-          features: [
-            'Access to all models, including Frontier and Open-Weights',
-            '15x higher limits on all models than Pro',
-            'Extend usage with extra credits',
-            'Run additional models from custom endpoints',
-          ],
-          cta: 'Get Ultra',
-          href: 'https://console.stagewise.io',
-        },
-      ],
-    },
-    {
-      name: 'Enterprise',
-      price: 'Custom',
-      period: '',
-      features: [
-        'Regulatory and audit compliance',
-        'Global configuration of inference and models',
-        'Access to stagewise Cloud Inference and stagewise Cloud Inference EU',
-        'SSO with OIDC and SAML',
-        'Provisioning with SCIM',
-        'Optional self-hosting of the stagewise Cloud',
-      ],
-      cta: 'Contact Sales',
-      popular: false,
-      useSecondaryButton: true,
-      href: '/enterprise',
     },
   ];
 
@@ -103,9 +53,8 @@ export default function PricingPage() {
                 <span className="text-foreground">Pricing</span>
               </h1>
               <p className="max-w-2xl text-lg text-muted-foreground leading-relaxed">
-                Start for free, then upgrade to Pro or Ultra for significantly
-                higher limits across all models - or bring your own key for
-                unlimited access.
+                Use stagewise with your own provider subscription, API keys, or
+                local inference. Provider pricing and usage limits apply.
               </p>
             </div>
           </ScrollReveal>

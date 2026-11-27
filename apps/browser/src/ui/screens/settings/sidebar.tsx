@@ -8,7 +8,6 @@ import {
   TITLEBAR_ICON_OPTICAL_OFFSET,
 } from '@shared/titlebar';
 import { SidebarTitlebarRow } from '../main/_components/sidebar-titlebar-row';
-import { SidebarAuthFooter } from '../main/_components/sidebar-auth-footer';
 import {
   SETTINGS_NAV_GROUPS,
   getSettingsSectionLabel,
@@ -86,8 +85,6 @@ export function SettingsSidebar() {
             </div>
           ))}
         </nav>
-
-        <SidebarAuthFooter />
       </div>
     </div>
   );

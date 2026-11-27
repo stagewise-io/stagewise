@@ -3,28 +3,10 @@ import type {
   KartonContract,
   OnboardingCompletionSummary,
 } from '@shared/karton-contracts/ui';
-import type { AuthHandoffProvider } from '@shared/karton-contracts/ui/telemetry';
-import {
-  type BackendEventProperties,
-  isUIEventName,
-  parseUIEventProperties,
-} from './telemetry';
+import { isUIEventName, parseUIEventProperties } from './telemetry';
 
 type Assert<T extends true> = T;
 type IsExact<T, U> = [T] extends [U] ? ([U] extends [T] ? true : false) : false;
-type ProviderOf<T> = T extends { provider?: infer P } ? P : never;
-type _AccountProviderContract = Assert<
-  IsExact<
-    ProviderOf<BackendEventProperties['account-auth-method-failed']>,
-    AuthHandoffProvider
-  >
->;
-type _ChatProviderContract = Assert<
-  IsExact<
-    ProviderOf<BackendEventProperties['chat-auth-method-failed']>,
-    AuthHandoffProvider
-  >
->;
 type OnboardingCompletionInput = Exclude<
   Parameters<
     KartonContract['serverProcedures']['userExperience']['setHasSeenOnboardingFlow']
@@ -222,7 +204,6 @@ describe('onboarding funnel telemetry schemas', () => {
         'onboarding-started',
         {
           onboarding_run_id: 'run-1',
-          already_authenticated: false,
           connected_provider_count: 0,
         },
       ],
@@ -348,133 +329,20 @@ describe('onboarding funnel telemetry schemas', () => {
   });
 });
 
-describe('auth UI telemetry schemas', () => {
-  it('registers all social auth UI event names', () => {
-    for (const eventName of SOCIAL_AUTH_EVENTS) {
-      expect(isUIEventName(eventName)).toBe(true);
+describe('retired account telemetry', () => {
+  it('does not register retired account event names', () => {
+    for (const eventName of [
+      ...SOCIAL_AUTH_EVENTS,
+      ...OTP_AUTH_EVENTS,
+      ...OTP_FAILURE_EVENTS,
+      ...METHOD_FAILURE_EVENTS,
+      ...EMAIL_HANDOFF_EVENTS,
+    ]) {
+      expect(isUIEventName(eventName)).toBe(false);
     }
   });
 
-  it('accepts Google and GitHub as social providers', () => {
-    for (const eventName of SOCIAL_AUTH_EVENTS) {
-      expect(parseUIEventProperties(eventName, { provider: 'google' })).toEqual(
-        {
-          provider: 'google',
-        },
-      );
-      expect(parseUIEventProperties(eventName, { provider: 'github' })).toEqual(
-        {
-          provider: 'github',
-        },
-      );
-    }
-  });
-
-  it('rejects non-social providers for social auth events', () => {
-    for (const eventName of SOCIAL_AUTH_EVENTS) {
-      expect(
-        parseUIEventProperties(eventName, { provider: 'openai' }),
-      ).toBeNull();
-      expect(parseUIEventProperties(eventName, {})).toBeNull();
-    }
-  });
-
-  it('accepts OTP requested and verified events without properties', () => {
-    for (const eventName of OTP_AUTH_EVENTS) {
-      expect(parseUIEventProperties(eventName, undefined)).toBeUndefined();
-    }
-  });
-
-  it('rejects unexpected properties for OTP requested and verified events', () => {
-    for (const eventName of OTP_AUTH_EVENTS) {
-      expect(
-        parseUIEventProperties(eventName, { provider: 'google' }),
-      ).toBeNull();
-    }
-  });
-
-  it('registers email handoff events without properties', () => {
-    for (const eventName of EMAIL_HANDOFF_EVENTS) {
-      expect(isUIEventName(eventName)).toBe(true);
-      expect(parseUIEventProperties(eventName, undefined)).toBeUndefined();
-      expect(
-        parseUIEventProperties(eventName, { email: 'secret@example.com' }),
-      ).toBeNull();
-    }
-  });
-
-  it('validates OTP failure kinds', () => {
-    for (const eventName of OTP_FAILURE_EVENTS) {
-      expect(
-        parseUIEventProperties(eventName, { error_kind: 'backend-error' }),
-      ).toEqual({ error_kind: 'backend-error' });
-      expect(
-        parseUIEventProperties(eventName, {
-          error_kind: 'turnstile-not-ready',
-        }),
-      ).toEqual({ error_kind: 'turnstile-not-ready' });
-      expect(
-        parseUIEventProperties(eventName, {
-          error_kind: 'turnstile-solve-failed',
-        }),
-      ).toEqual({ error_kind: 'turnstile-solve-failed' });
-      expect(
-        parseUIEventProperties(eventName, { error_kind: 'validation-error' }),
-      ).toBeNull();
-    }
-  });
-
-  it('validates account and chat auth method failure metadata', () => {
-    for (const eventName of METHOD_FAILURE_EVENTS) {
-      expect(
-        parseUIEventProperties(eventName, {
-          auth_method: 'stagewise',
-          provider: 'google',
-          error_kind: 'network-error',
-        }),
-      ).toEqual({
-        auth_method: 'stagewise',
-        provider: 'google',
-        error_kind: 'network-error',
-      });
-      expect(
-        parseUIEventProperties(eventName, {
-          auth_method: 'stagewise',
-          error_kind: 'validation-error',
-        }),
-      ).toEqual({
-        auth_method: 'stagewise',
-        error_kind: 'validation-error',
-      });
-      expect(
-        parseUIEventProperties(eventName, {
-          auth_method: 'api-keys',
-          provider: 'google',
-          error_kind: 'network-error',
-        }),
-      ).toBeNull();
-      expect(
-        parseUIEventProperties(eventName, {
-          auth_method: 'stagewise',
-          provider: 'email',
-          error_kind: 'network-error',
-        }),
-      ).toEqual({
-        auth_method: 'stagewise',
-        provider: 'email',
-        error_kind: 'network-error',
-      });
-      expect(
-        parseUIEventProperties(eventName, {
-          auth_method: 'stagewise',
-          provider: 'anthropic',
-          error_kind: 'network-error',
-        }),
-      ).toBeNull();
-    }
-  });
-
-  it('accepts model and auth handoff providers for onboarding method failures', () => {
+  it('accepts external providers and rejects retired account methods', () => {
     expect(
       parseUIEventProperties('onboarding-auth-method-failed', {
         auth_method: 'api-keys',
@@ -492,22 +360,14 @@ describe('auth UI telemetry schemas', () => {
         provider: 'github',
         error_kind: 'backend-error',
       }),
-    ).toEqual({
-      auth_method: 'stagewise',
-      provider: 'github',
-      error_kind: 'backend-error',
-    });
+    ).toBeNull();
     expect(
       parseUIEventProperties('onboarding-auth-method-failed', {
         auth_method: 'stagewise',
         provider: 'email',
         error_kind: 'backend-error',
       }),
-    ).toEqual({
-      auth_method: 'stagewise',
-      provider: 'email',
-      error_kind: 'backend-error',
-    });
+    ).toBeNull();
     expect(
       parseUIEventProperties('onboarding-auth-method-failed', {
         auth_method: 'stagewise',
