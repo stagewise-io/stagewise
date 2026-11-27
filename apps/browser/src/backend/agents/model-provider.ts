@@ -21,7 +21,6 @@ import {
   getModelAlias,
 } from '@shared/available-models';
 import { CODING_PLANS, resolveCodingPlanBaseUrl } from '@shared/coding-plans';
-import type { AuthService } from '@/services/auth';
 import type { PreferencesService } from '@/services/preferences';
 import type { streamText } from 'ai';
 import { wrapLanguageModel } from 'ai';
@@ -47,7 +46,6 @@ import {
 // ── Provider type registry ──────────────────────────────────────────────────
 import type { ProviderType } from './providers/types';
 import { getProviderType, getProviderTypeByVendor } from './providers/registry';
-import { stagewiseProviderType } from './providers/stagewise';
 import {
   getCodingPlanVendor,
   type CodingPlanConfig,
@@ -125,16 +123,13 @@ export type ModelWithOptions = {
  */
 export class ModelProviderService {
   private readonly telemetryService: TelemetryService;
-  private readonly authService: AuthService;
   private readonly preferencesService: PreferencesService;
 
   public constructor(
     telemetryService: TelemetryService,
-    authService: AuthService,
     preferencesService: PreferencesService,
   ) {
     this.telemetryService = telemetryService;
-    this.authService = authService;
     this.preferencesService = preferencesService;
   }
 
@@ -202,8 +197,7 @@ export class ModelProviderService {
 
   /**
    * Resolve credentials, base URL, and provider type for a given vendor.
-   * Falls back to the shared stagewise instance when no vendor-specific
-   * instance exists.
+   * Requires a configured external provider instance.
    */
   private resolveVendorEndpoint(provider: ModelProvider): {
     instance: ProviderInstance | undefined;
@@ -214,8 +208,6 @@ export class ModelProviderService {
     connectedCodingPlanId?: string;
   } {
     const prefs = this.preferencesService.get();
-    const proxyBaseUrl =
-      process.env.LLM_PROXY_URL || 'https://llm.stagewise.io';
 
     const instance = findInstanceForVendor(prefs, provider);
     if (!instance) {
@@ -232,13 +224,9 @@ export class ModelProviderService {
       }
     }
     if (!instance || instance.typeId === 'stagewise') {
-      return {
-        instance: undefined,
-        type: stagewiseProviderType,
-        apiKey: this.authService.accessToken ?? '',
-        baseURL: proxyBaseUrl,
-        decryptedConfig: {},
-      };
+      throw new Error(
+        `Configure a provider for ${provider} in Models & Providers settings`,
+      );
     }
 
     const type = getProviderType(instance.typeId);
@@ -278,7 +266,6 @@ export class ModelProviderService {
    * the routing layer resolves the instance directly rather than via
    * vendor-based routing.
    *
-   * - `stagewise` instance → Stagewise Inference (same as vendor fallback).
    * - `coding-plan` / `*-api` instance → delegate to `resolveVendorEndpoint`
    *   using the vendor derived from the instance type, but use the instance's
    *   own config for decryption.
@@ -299,29 +286,14 @@ export class ModelProviderService {
     const prefs = this.preferencesService.get();
     const instance = prefs.providerInstances.find((i) => i.id === instanceId);
     if (!instance) {
-      // Legacy migrated custom models use this well-known Stagewise sentinel
-      // even when the provider instance was not persisted by older versions.
-      if (instanceId === 'stagewise-default') {
-        return {
-          instance: undefined,
-          type: stagewiseProviderType,
-          apiKey: this.authService.accessToken ?? '',
-          baseURL: process.env.LLM_PROXY_URL || 'https://llm.stagewise.io',
-          decryptedConfig: {} as Record<string, string>,
-        };
-      }
       throw new Error(`Provider instance ${instanceId} not found`);
     }
 
-    // Stagewise instance → inference path (same as no-vendor fallback).
+    // Reject persisted references to the retired managed provider.
     if (instance.typeId === 'stagewise') {
-      return {
-        instance: undefined,
-        type: stagewiseProviderType,
-        apiKey: this.authService.accessToken ?? '',
-        baseURL: process.env.LLM_PROXY_URL || 'https://llm.stagewise.io',
-        decryptedConfig: {} as Record<string, string>,
-      };
+      throw new Error(
+        'Select an external provider in Models & Providers settings',
+      );
     }
 
     const type = getProviderType(instance.typeId);
@@ -456,20 +428,8 @@ export class ModelProviderService {
       );
     }
 
-    // Older preferences can reference the well-known Stagewise route without
-    // persisting a corresponding instance. Preserve only that compatibility
-    // route; every other missing explicit instance fails closed.
-    if (!providerInstance) {
-      if (providerInstanceId !== 'stagewise-default') return false;
-      return (
-        !!getAvailableModel(modelId) ||
-        preferences.customModels.some(
-          (model) =>
-            model.modelId === modelId &&
-            (model.providerInstanceId ?? model.endpointId) ===
-              'stagewise-default',
-        )
-      );
+    if (!providerInstance || providerInstance.typeId === 'stagewise') {
+      return false;
     }
 
     return !!findModelSelectorEntry(preferences, providerInstanceId, modelId);
@@ -668,15 +628,10 @@ export class ModelProviderService {
     if (providerInstanceId) {
       resolved = this.resolveInstanceById(providerInstanceId, officialProvider);
     } else {
-      resolved = officialProvider
-        ? this.resolveVendorEndpoint(officialProvider)
-        : {
-            instance: undefined,
-            type: stagewiseProviderType,
-            apiKey: this.authService.accessToken ?? '',
-            baseURL: process.env.LLM_PROXY_URL || 'https://llm.stagewise.io',
-            decryptedConfig: {} as Record<string, string>,
-          };
+      if (!officialProvider) {
+        throw new Error('Select a configured provider instance for this model');
+      }
+      resolved = this.resolveVendorEndpoint(officialProvider);
     }
 
     const { type, apiKey, baseURL, decryptedConfig, instance } = resolved;

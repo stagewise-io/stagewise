@@ -52,10 +52,6 @@ const config = {
   async rewrites() {
     return [
       {
-        source: '/api/auth/:path*',
-        destination: 'https://api.stagewise.io/v1/auth/:path*',
-      },
-      {
         source: '/ingest/static/:path*',
         destination: 'https://eu-assets.i.posthog.com/static/:path*',
       },

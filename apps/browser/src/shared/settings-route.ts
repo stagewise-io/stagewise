@@ -11,7 +11,6 @@ export type SettingsSection =
   | 'archived-agents'
   | 'website-permissions'
   | 'clear-data'
-  | 'account'
   | 'about';
 
 export type SettingsRoute =
@@ -31,6 +30,5 @@ export const SETTINGS_SECTION_LABELS: Record<SettingsSection, string> = {
   'archived-agents': 'Archived chats',
   'website-permissions': 'Website Permissions',
   'clear-data': 'Clear data',
-  account: 'Account',
   about: 'About',
 };

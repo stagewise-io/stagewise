@@ -1391,7 +1391,7 @@ Move low-level agent-owned services/utilities:
 
 Keep behavior unchanged.
 
-Phase 4 complete: all listed services (minus `asset-cache`, which stays host-owned until the stagewise-auth tool-capability surface is formalized in Phase 7) now live inside `@stagewise/agent-core`. Relocations:
+Phase 4 complete: all listed services (minus `asset-cache`, which stays host-owned to resolve local attachments) now live inside `@stagewise/agent-core`. Relocations:
 
 - `packages/agent-core/src/services/attachments/` — six free functions (`writeBlob`, `readBlob`, `readBlobStream`, `deleteAgentBlobs`, `blobExists`, `getAgentBlobDir`, `getBlobPath`) parameterized on `HostPaths`, replacing `apps/browser/src/backend/utils/attachment-blobs.ts`.
 - `packages/agent-core/src/services/agent-persistence/` — `AgentPersistenceDB.create({ host, logger })` resolves `host.paths.agentDbPath()` internally; `StoredAgentInstance` / `NewStoredAgentInstance` / `ToolApprovalMode` schemas ship from core. Migrations and `schema.sql` moved as-is.

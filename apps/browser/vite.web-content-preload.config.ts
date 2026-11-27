@@ -21,9 +21,6 @@ export default defineConfig({
     },
   },
   define: {
-    STAGEWISE_CONSOLE_URL: JSON.stringify(
-      process.env.STAGEWISE_CONSOLE_URL ?? 'https://console.stagewise.io',
-    ),
     ...Object.fromEntries(
       Object.entries(buildConstants).map(([key, value]) => [
         key,

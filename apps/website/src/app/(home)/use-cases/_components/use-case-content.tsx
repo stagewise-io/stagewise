@@ -19,9 +19,9 @@ export function UseCaseContent({ modelName }: UseCaseContentProps) {
               </h1>
               <p className="max-w-2xl text-lg text-muted-foreground leading-relaxed">
                 stagewise is a frontier-grade harness that maximizes the power
-                of {modelName} and serves {modelName} models either via the
-                stagewise Account, your existing subscriptions or your API keys.
-                Get a first class coding experience with {modelName}.
+                of {modelName} and serves {modelName} models via your existing
+                subscriptions, API keys, or custom endpoints. Get a first class
+                coding experience with {modelName}.
               </p>
               <div className="mt-8">
                 <DownloadButtons />
@@ -46,10 +46,9 @@ export function UseCaseContent({ modelName }: UseCaseContentProps) {
                   stagewise maximizes the capabilities of {modelName} by
                   providing a frontier-grade agent harness that manages context
                   efficiently, orchestrates multi-step workflows, and integrates
-                  directly with your development environment. Whether you use
-                  the stagewise Account, bring your own API key, or connect your
-                  existing subscription, {modelName} runs first-class inside
-                  stagewise.
+                  directly with your development environment. Whether you bring
+                  your own API key or connect your existing subscription,
+                  {modelName} runs first-class inside stagewise.
                 </p>
               </div>
             </div>

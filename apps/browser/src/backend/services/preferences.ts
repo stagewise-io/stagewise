@@ -149,6 +149,14 @@ export class PreferencesService extends DisposableService {
     // migration remains safe when the instance array is already non-empty.
     await this.migrateLegacyCodingPlansToProviderInstances();
     await this.migrateLegacyQwenCodingPlanEndpoint();
+    // Retire persisted managed-inference instances without touching external providers.
+    const instances = this.preferences.providerInstances;
+    this.preferences.providerInstances = instances.filter(
+      (instance) => instance.typeId !== 'stagewise',
+    );
+    if (instances.length !== this.preferences.providerInstances.length) {
+      await this.save();
+    }
 
     this.logger.debug('[PreferencesService] Loaded preferences', {
       telemetryLevel: this.preferences.privacy.telemetryLevel,
@@ -274,17 +282,6 @@ export class PreferencesService extends DisposableService {
     const vendorToInstanceId = new Map<ModelProvider, string>();
     // endpoint ids consumed by a providerConfig custom-mode entry
     const consumedEndpointIds = new Set<string>();
-
-    // 1. Seed the shared stagewise instance.
-    instances.push({
-      id: 'stagewise-default',
-      typeId: 'stagewise',
-      name: 'Stagewise Inference',
-      config: {},
-      enabledModelIds: [],
-      disabledModelIds: [],
-      discoveredModels: [],
-    });
 
     // 2. Process providerConfigs.
     for (const vendor of VENDORS) {

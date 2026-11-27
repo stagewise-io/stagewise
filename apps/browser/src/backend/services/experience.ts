@@ -41,7 +41,7 @@ import { codingPlanIds, type CodingPlanId } from '@shared/coding-plan-ids';
 import type { GitRepositoryInfo, GitService } from './git';
 
 export type OnboardingAuthCompletion = {
-  auth_method: 'stagewise' | 'api-keys' | 'coding-plan' | 'unknown';
+  auth_method: 'api-keys' | 'coding-plan' | 'unknown';
   provider?: ModelProvider;
   plan_id?: CodingPlanId;
 };
@@ -54,7 +54,7 @@ type OnboardingCompletionInput = {
 
 const onboardingAuthCompletionSchema = z
   .object({
-    auth_method: z.enum(['stagewise', 'api-keys', 'coding-plan', 'unknown']),
+    auth_method: z.enum(['api-keys', 'coding-plan', 'unknown']),
     provider: modelProviderSchema.optional(),
     plan_id: z.enum(codingPlanIds).optional(),
   })
@@ -360,9 +360,7 @@ export class UserExperienceService extends DisposableService {
 
   private handleServiceStateChange() {
     // Load stored experience data if needed (only once per session)
-    const state = this.uiKarton.state;
     const needsInitialization =
-      state.userAccount?.status === 'authenticated' &&
       !this.hasInitializedStoredExperienceData &&
       !this.isLoadingStoredExperienceData;
 

@@ -34,11 +34,6 @@ import { App } from '@ui/app';
 import { initThemeColorSync } from '@ui/utils/theme-color-sync';
 import { containsResizeObserverLoopError } from '@ui/utils/resize-observer';
 
-// Register global Turnstile solver for cross-context token proxy.
-// Must live in the UI renderer (not pages) because vite.ui.config.ts
-// has envDir set to read VITE_TURNSTILE_SITE_KEY from apps/browser/.env.
-import '@ui/services/turnstile-solver';
-
 function errorFromErrorEvent(event: ErrorEvent) {
   if (event.error instanceof Error) return event.error;
 

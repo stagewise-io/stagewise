@@ -53,7 +53,6 @@ export class CredentialsService extends DisposableService {
 
   private store: CredentialsStore = {};
   private saveQueue: Promise<void> = Promise.resolve();
-  private accessTokenProvider?: () => string | undefined;
 
   private constructor(logger: Logger) {
     super();
@@ -89,14 +88,6 @@ export class CredentialsService extends DisposableService {
   }
 
   /**
-   * Register a callback that provides the stagewise access token
-   * at resolve time. Called once during app initialization.
-   */
-  public setAccessTokenProvider(provider: () => string | undefined): void {
-    this.accessTokenProvider = provider;
-  }
-
-  /**
    * Store credential data for a registered type.
    * Validates that the type exists and the data matches its schema.
    *
@@ -108,9 +99,6 @@ export class CredentialsService extends DisposableService {
     data: CredentialInputData<T>,
   ): Promise<void> {
     this.assertNotDisposed();
-    if (typeId === 'stagewise-auth') {
-      throw new Error('stagewise-auth credential is managed automatically');
-    }
     const typeDef = credentialTypeRegistry[typeId];
     if (!typeDef) throw new Error(`Unknown credential type: ${typeId}`);
 
@@ -127,9 +115,6 @@ export class CredentialsService extends DisposableService {
    */
   public async delete(typeId: CredentialTypeId): Promise<void> {
     this.assertNotDisposed();
-    if (typeId === 'stagewise-auth') {
-      throw new Error('stagewise-auth credential is managed automatically');
-    }
     if (!(typeId in this.store)) return;
 
     delete this.store[typeId];
@@ -171,10 +156,6 @@ export class CredentialsService extends DisposableService {
     typeId: CredentialTypeId,
   ): Promise<ResolvedCredential | null> {
     this.assertNotDisposed();
-
-    if (typeId === 'stagewise-auth') {
-      return this.resolveStageWiseAuth();
-    }
 
     const typeDef = credentialTypeRegistry[typeId];
     if (!typeDef) return null;
@@ -232,25 +213,6 @@ export class CredentialsService extends DisposableService {
     }
 
     return { data, secretMap };
-  }
-
-  private resolveStageWiseAuth(): ResolvedCredential | null {
-    const token = this.accessTokenProvider?.();
-    if (!token) return null;
-
-    const typeDef = credentialTypeRegistry['stagewise-auth'];
-    const nonce = generateNonce();
-    const placeholder = `{{CRED:stagewise-auth:accessToken:${nonce}}}`;
-    const secretMap = new Map<string, SecretEntry>();
-    secretMap.set(placeholder, {
-      value: token,
-      allowedOrigins: typeDef.allowedOrigins,
-    });
-
-    return {
-      data: { accessToken: placeholder },
-      secretMap,
-    };
   }
 
   protected onTeardown(): void {

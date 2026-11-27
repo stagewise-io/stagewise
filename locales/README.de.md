@@ -64,11 +64,6 @@ Verbinde eines der folgenden Abos mit einem einzigen API-Schlüssel und erhalte 
 | Xiaomi MiMo | [Xiaomi MiMo](https://platform.xiaomimimo.com) | MiMo-V2.5-Pro, MiMo-V2.5 | [API-Schlüssel holen](https://platform.xiaomimimo.com/#/console/plan-manage) |
 | Mistral | [Mistral](https://console.mistral.ai) | Mistral Medium 3.5, Mistral Large 3, Mistral Small 4, Codestral | [API-Schlüssel holen](https://console.mistral.ai/api-keys) |
 
-### stagewise Account (Sunset)
-
-> [!NOTE]
-> Der stagewise-Account-Service wird Ende November 2026 eingestellt. Um stagewise weiter zu nutzen, bringe stattdessen dein eigenes Abo oder deine eigenen API-Schlüssel mit — siehe die Optionen oben.
-
 ## Lizenz
 
 stagewise wird von der stagewise GmbH entwickelt und unter der AGPLv3-Lizenz angeboten.

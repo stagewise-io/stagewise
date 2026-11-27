@@ -87,12 +87,7 @@ describe('PreferencesService provider instance names', () => {
     expect(third).toMatchObject({ success: true });
     expect(
       service.get().providerInstances.map((instance) => instance.name),
-    ).toEqual([
-      'Stagewise Inference',
-      'OpenAI API',
-      'OpenAI API (2)',
-      'OpenAI API (3)',
-    ]);
+    ).toEqual(['OpenAI API', 'OpenAI API (2)', 'OpenAI API (3)']);
 
     await service.removeProviderInstance(
       (second as { instanceId: string }).instanceId,
@@ -470,6 +465,49 @@ describe('PreferencesService legacy provider migration', () => {
     persistedDataMock.writePersistedData.mockResolvedValue(undefined);
   });
 
+  it('ignores retired account inference without reading sign-in data', async () => {
+    const preferences = cloneDefaultPreferences();
+    preferences.providerInstances = [
+      {
+        id: 'stagewise-default',
+        typeId: 'stagewise',
+        name: 'Legacy inference',
+        config: {},
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+      {
+        id: 'local-endpoint',
+        typeId: 'custom-openai-chat',
+        name: 'Local inference',
+        config: { baseUrl: 'http://localhost:8080/v1' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+    ];
+
+    const service = await createServiceWithPreferences(preferences);
+
+    expect(service.get().providerInstances).toEqual([
+      expect.objectContaining({
+        id: 'local-endpoint',
+        config: { baseUrl: 'http://localhost:8080/v1' },
+      }),
+    ]);
+    expect(
+      persistedDataMock.readPersistedData.mock.calls.map(([key]) => key),
+    ).toEqual(['preferences']);
+    expect(persistedDataMock.writePersistedData).toHaveBeenCalledWith(
+      'preferences',
+      expect.anything(),
+      expect.objectContaining({
+        providerInstances: service.get().providerInstances,
+      }),
+    );
+  });
+
   it('migrates official keys, custom endpoints and models, disabled models, and every coding plan idempotently', async () => {
     const preferences = cloneDefaultPreferences();
     preferences.providerConfigs.openai = {
@@ -533,11 +571,8 @@ describe('PreferencesService legacy provider migration', () => {
     const service = await createServiceWithPreferences(preferences);
     const instances = service.get().providerInstances;
 
-    expect(instances).toContainEqual(
-      expect.objectContaining({
-        id: 'stagewise-default',
-        disabledModelIds: [],
-      }),
+    expect(instances).not.toContainEqual(
+      expect.objectContaining({ id: 'stagewise-default' }),
     );
     expect(instances).toContainEqual(
       expect.objectContaining({

@@ -236,8 +236,8 @@ export function createBrowserHostModels(
  *
  * Boot-order rationale (Phase 5, D2): `DiffHistoryService` requires
  * `AgentHost.paths` / `.logger` / `.telemetry` and constructs early
- * (right after `createAgentCoreSeam`), well before `authService` and
- * therefore `modelProviderService` are available. The service itself
+ * (right after `createAgentCoreSeam`), before `modelProviderService`
+ * is available. The service itself
  * never touches `host.models`, so the lazy proxy is invisible in
  * practice; it only matters for any agent-core code that *does* try to
  * resolve a model before the bridge attaches.

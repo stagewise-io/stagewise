@@ -75,11 +75,6 @@ Connect directly to any of the following API providers with your own key. For ma
 | ------------- | ------------------- | ------------- |
 | OpenRouter    | Claude Opus 4.8, GPT-6.1 Sol, Gemini 3.1 Pro, DeepSeek V4 Pro | [Get API key](https://openrouter.ai/keys) |
 
-### stagewise Account (sunset)
-
-> [!NOTE]
-> The stagewise account service will be sunset at the end of November 2026. To keep using stagewise, bring your own subscription or API keys instead — see the options above.
-
 ## License
 
 stagewise is developed by stagewise GmbH and offered under the AGPLv3 license.

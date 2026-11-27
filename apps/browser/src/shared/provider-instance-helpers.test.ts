@@ -14,7 +14,6 @@ import {
   getSelectableUtilityModelEntries,
   getVendorInstanceId,
   getVendorMode,
-  isStagewiseInferenceAvailable,
   isStagewiseRoutedSelection,
   resolveModelThinkingOverride,
   vendorHasApiKey,
@@ -631,23 +630,7 @@ describe('native DeepSeek Flash matching', () => {
 });
 
 describe('Stagewise Inference visibility', () => {
-  it('is only available with an authenticated account', () => {
-    expect(isStagewiseInferenceAvailable('authenticated')).toBe(true);
-    // Optimistic while the backend is unreachable so signed-in users do
-    // not lose their models during a hiccup.
-    expect(isStagewiseInferenceAvailable('server_unreachable')).toBe(true);
-    expect(isStagewiseInferenceAvailable('unauthenticated')).toBe(false);
-    expect(isStagewiseInferenceAvailable('authentication_invalid')).toBe(false);
-    expect(isStagewiseInferenceAvailable(undefined)).toBe(false);
-  });
-
-  it('returns preferences unchanged when stagewise is available', () => {
-    const preferences = createPreferences();
-    const result = withoutStagewiseInference(preferences, true);
-    expect(result).toBe(preferences);
-  });
-
-  it('hides Stagewise Inference instances but keeps codex-stagewise while signed out', () => {
+  it('removes retired inference instances but keeps codex-stagewise', () => {
     const preferences = createPreferences();
     preferences.providerInstances = [
       ...(preferences.providerInstances ?? []),
@@ -656,7 +639,7 @@ describe('Stagewise Inference visibility', () => {
       codexStagewiseInstance,
     ];
 
-    const result = withoutStagewiseInference(preferences, false);
+    const result = withoutStagewiseInference(preferences);
 
     // Only `stagewise` is hidden — `codex-stagewise` runs Codex for
     // inference (the stagewise harness merely hosts it) and stays.

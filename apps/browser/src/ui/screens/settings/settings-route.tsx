@@ -8,7 +8,6 @@ import {
   GlobeIcon,
   Trash2Icon,
   ClockIcon,
-  UserIcon,
   InfoIcon,
   PaletteIcon,
   ArchiveIcon,
@@ -90,10 +89,6 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
   {
     label: '',
     items: [
-      {
-        section: 'account',
-        icon: <UserIcon className="size-4 shrink-0" />,
-      },
       {
         section: 'about',
         icon: <InfoIcon className="size-4 shrink-0" />,

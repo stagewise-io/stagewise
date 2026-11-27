@@ -303,10 +303,7 @@ function PluginDetailView({
   ) => Promise<void>;
   deleteCredential: (typeId: string) => Promise<void>;
 }) {
-  const userVisibleCredentials = useMemo(
-    () => plugin.requiredCredentials.filter((id) => id !== 'stagewise-auth'),
-    [plugin.requiredCredentials],
-  );
+  const userVisibleCredentials = plugin.requiredCredentials;
 
   const pluginMetaText = useMemo(() => {
     const parts: string[] = [];

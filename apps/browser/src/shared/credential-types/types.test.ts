@@ -69,12 +69,4 @@ describe('extractSecretFieldNames', () => {
     );
     expect(secrets).toEqual(['token']);
   });
-
-  it('correctly identifies stagewise-auth accessToken field', () => {
-    const schema = credentialTypeRegistry['stagewise-auth'].schema;
-    const secrets = extractSecretFieldNames(
-      schema as z.ZodObject<z.ZodRawShape>,
-    );
-    expect(secrets).toEqual(['accessToken']);
-  });
 });

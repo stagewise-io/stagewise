@@ -32,7 +32,6 @@ import {
   getSelectableModelEntries,
   getTypeDisplayInfo,
   getVendorForInstance,
-  isStagewiseInferenceAvailable,
   resolveCustomModelInstanceName,
   type ModelSelectorEntry,
   withoutStagewiseInference,
@@ -121,9 +120,6 @@ import {
 } from '@stagewise/stage-ui/components/menu';
 import { ContextMenu } from '@base-ui/react/context-menu';
 import { Menu as MenuBase } from '@base-ui/react/menu';
-
-const consoleUrl =
-  import.meta.env.VITE_STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io';
 
 enablePatches();
 
@@ -325,8 +321,6 @@ function ProviderInstanceCard({
   onRename?: () => void;
   onDelete?: () => void;
 }) {
-  const subscription = useKartonState((s) => s.userAccount.subscription);
-  const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
   const getUsageLimits = useKartonProcedure(
     (p) => p.preferences.getProviderUsageLimits,
   );
@@ -350,9 +344,6 @@ function ProviderInstanceCard({
   }, [connected, instance.id]);
 
   const displayInfo = getTypeDisplayInfo(instance.typeId);
-  const isStagewise = instance.typeId === 'stagewise';
-  const plan = subscription?.plan;
-  const isFreePlan = !plan || plan === 'free';
   const card = (
     <div
       className="cursor-pointer space-y-3 rounded-lg border border-derived bg-surface-1 p-3 transition-colors hover:bg-hover-derived focus-visible:bg-hover-derived active:bg-active-derived"
@@ -404,26 +395,6 @@ function ProviderInstanceCard({
           <IconChevronRightOutline18 className="size-3.5 text-muted-foreground" />
         </div>
       </div>
-
-      {/* Stagewise upgrade CTA for free accounts. */}
-      {isStagewise && isFreePlan && (
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-warning-foreground text-xs">
-            Requires Pro or Ultra plan
-          </p>
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={(event) => {
-              event.stopPropagation();
-              void openExternalUrl(consoleUrl);
-            }}
-          >
-            Upgrade to Pro
-            <IconArrowUpRightOutline18 className="size-3" />
-          </Button>
-        </div>
-      )}
     </div>
   );
 
@@ -1224,18 +1195,14 @@ function ProviderInstancesSection({
   onDelete: (instanceId: string) => void;
 }) {
   const preferences = useKartonState((s) => s.preferences);
-  const authStatus = useKartonState((s) => s.userAccount.status);
-  const stagewiseAvailable = isStagewiseInferenceAvailable(authStatus);
   const [showAddProvider, setShowAddProvider] = useState(false);
 
   // Stagewise Inference instances are hidden while the user is not
   // signed in. They stay stored (nothing is deleted) and reappear once
   // the user signs in.
   const instances = useMemo(
-    () =>
-      withoutStagewiseInference(preferences, stagewiseAvailable)
-        .providerInstances ?? [],
-    [preferences, stagewiseAvailable],
+    () => withoutStagewiseInference(preferences).providerInstances ?? [],
+    [preferences],
   );
 
   // Sort: stagewise first, then coding-plan, then vendor-api, then custom
@@ -2380,8 +2347,6 @@ function ModelsSection({
   const refreshInstanceModels = useKartonProcedure(
     (p) => p.preferences.refreshInstanceModels,
   );
-  const authStatus = useKartonState((s) => s.userAccount.status);
-  const stagewiseAvailable = isStagewiseInferenceAvailable(authStatus);
 
   const isTrulyCustom =
     !!filterInstance && filterInstance.typeId in INSTANCE_TYPE_ID_TO_API_SPEC;
@@ -2409,8 +2374,8 @@ function ModelsSection({
   // user is not signed in. Write handlers below keep using the
   // unfiltered `preferences`.
   const selectionPreferences = useMemo(
-    () => withoutStagewiseInference(preferences, stagewiseAvailable),
-    [preferences, stagewiseAvailable],
+    () => withoutStagewiseInference(preferences),
+    [preferences],
   );
   const providerInstances = selectionPreferences.providerInstances ?? [];
 
@@ -3559,8 +3524,6 @@ function SelfHostedConnection({ instance }: { instance: ProviderInstance }) {
 
 export function ModelsProvidersSection() {
   const preferences = useKartonState((s) => s.preferences);
-  const authStatus = useKartonState((s) => s.userAccount.status);
-  const stagewiseAvailable = isStagewiseInferenceAvailable(authStatus);
   const [detailInstanceId, setDetailInstanceId] = useState<string | null>(null);
   const [detailRenameRequested, setDetailRenameRequested] = useState(false);
   const [isDetailNameEditing, setIsDetailNameEditing] = useState(false);
@@ -3589,16 +3552,6 @@ export function ModelsProvidersSection() {
       total: entries.length,
     };
   }, [detailInstance, preferences]);
-
-  // If the user signs out while viewing a Stagewise Inference detail
-  // page, fall back to the list — the entry is hidden while signed out.
-  // (`codex-stagewise` is unaffected: it runs Codex for inference.)
-  useEffect(() => {
-    if (!stagewiseAvailable && detailInstance?.typeId === 'stagewise') {
-      setDetailInstanceId(null);
-      setDetailRenameRequested(false);
-    }
-  }, [detailInstance?.typeId, stagewiseAvailable]);
 
   // Intercept Escape on the capture phase when a detail page is open.
   // This fires before the global bubble-phase handler in
@@ -3734,15 +3687,6 @@ export function ModelsProvidersSection() {
 
               {credentialType === 'custom-endpoint' && (
                 <CustomEndpointConnection instance={detailInstance} />
-              )}
-
-              {detailInstance.typeId === 'stagewise' && (
-                <div className="rounded-lg border border-derived p-3">
-                  <p className="text-muted-foreground text-xs">
-                    Uses your stagewise account. All built-in models are
-                    available through Stagewise Inference by default.
-                  </p>
-                </div>
               )}
             </section>
 

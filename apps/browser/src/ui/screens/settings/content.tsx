@@ -9,7 +9,6 @@ import { BrowsingSettingsSection } from './sections/browsing-settings-section';
 import { PersonalizationSettingsSection } from './sections/personalization-settings-section';
 import { WebsitePermissionsSection } from './sections/website-permissions-section';
 import { ClearDataSection } from './sections/clear-data-section';
-import { AccountSection } from './sections/account-section';
 import { AboutSection } from './sections/about-section';
 import { HistorySection } from './sections/history-section';
 import { WorktreeSetupSection } from './sections/agent-settings.worktree-setup';
@@ -40,8 +39,6 @@ export function SettingsContent() {
       return <WebsitePermissionsSection />;
     case 'clear-data':
       return <ClearDataSection />;
-    case 'account':
-      return <AccountSection />;
     case 'about':
       return <AboutSection />;
     case 'history':

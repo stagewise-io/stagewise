@@ -3,7 +3,6 @@
  */
 
 import { app, clipboard, dialog } from 'electron';
-import { AuthService } from './services/auth';
 import { AgentManagerService } from './services/agent-manager';
 import { enrichHistoryEntryWorkspaces } from './services/agent-manager/history-workspace-enrichment';
 import { UserExperienceService } from './services/experience';
@@ -333,11 +332,8 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     localPortsScannerService,
   );
 
-  // Set up URL handlers, capturing the auth callback registration function
-  const registerAuthCallbackHandler = setupUrlHandlers(
-    windowLayoutService,
-    logger,
-  );
+  // Set up workspace deep-link and browser URL handlers.
+  setupUrlHandlers(windowLayoutService, logger);
 
   const notificationService = await NotificationService.create(
     logger,
@@ -498,17 +494,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   // URL handling is done in main.ts via setupUrlHandlers() and handleCommandLineUrls()
   await URIHandlerService.create(logger);
 
-  const authService = await AuthService.create(
-    identifierService,
-    uiKarton,
-    notificationService,
-    logger,
-  );
-
-  // Wire auth callback handler so social sign-in / protocol URLs are
-  // routed to AuthService instead of opened as browser tabs.
-  registerAuthCallbackHandler((url) => authService.handleAuthCallbackUrl(url));
-
   const userExperienceService = await UserExperienceService.create(
     logger,
     uiKarton,
@@ -520,14 +505,11 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
 
   const credentialsService = await CredentialsService.create(logger);
 
-  credentialsService.setAccessTokenProvider(() => authService.accessToken);
-
   const toolboxService = await ToolboxService.create(
     logger,
     uiKarton,
     diffHistoryService,
     windowLayoutService,
-    authService,
     telemetryService,
     filePickerService,
     userExperienceService,
@@ -581,15 +563,10 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       );
   });
 
-  const _appMenuService = new AppMenuService(
-    logger,
-    authService,
-    windowLayoutService,
-  );
+  const _appMenuService = new AppMenuService(logger, windowLayoutService);
 
   const modelProviderService = new ModelProviderService(
     telemetryService,
-    authService,
     preferencesService,
   );
 
@@ -640,10 +617,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   // constructed after the toolbox itself.
   toolboxService.setModelProviderService(modelProviderService);
 
-  const assetCacheService = await AssetCacheService.create(
-    () => authService.accessToken,
-    logger,
-  );
+  const assetCacheService = await AssetCacheService.create(logger);
 
   const processedImageCacheService = persistence.processedImageCache;
 
@@ -1238,20 +1212,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     },
   );
 
-  // userAccount.getUsageCurrent / getUsageHistory
-  uiKarton.registerServerProcedureHandler(
-    'userAccount.getUsageCurrent',
-    async (_cid: string) => {
-      return authService.getUsageCurrent();
-    },
-  );
-  uiKarton.registerServerProcedureHandler(
-    'userAccount.getUsageHistory',
-    async (_cid: string, params: { days?: number }) => {
-      return authService.getUsageHistory(params.days);
-    },
-  );
-
   // toolbox worktree setup settings procedures
   uiKarton.registerServerProcedureHandler(
     'toolbox.listWorktreeSetupRepositories',
@@ -1313,9 +1273,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   logger.debug('[Main] Startup complete');
 
   // Handle command line arguments for URLs on initial startup
-  handleCommandLineUrls(process.argv, windowLayoutService, logger, (url) =>
-    authService.handleAuthCallbackUrl(url),
-  );
+  handleCommandLineUrls(process.argv, windowLayoutService, logger);
 
   // Set up graceful shutdown to clean up database connections
   let isShuttingDown = false;
@@ -1433,9 +1391,6 @@ function extractUrlsFromArgs(argv: string[]): string[] {
   return urls;
 }
 
-type AuthCallbackHandler = (url: string) => boolean | Promise<boolean>;
-const MAX_QUEUED_AUTH_CALLBACK_URLS = 5;
-
 function isAuthCallbackUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
@@ -1468,33 +1423,16 @@ function describeIncomingUrl(url: string): string {
   }
 }
 
-function handleAuthCallbackUrl(
-  url: string,
-  logger: Logger,
-  authCallbackHandler: AuthCallbackHandler,
-): void {
-  void Promise.resolve(authCallbackHandler(url)).catch((error) => {
-    logger.error(`[Main] Auth callback handling failed: ${String(error)}`);
-  });
-}
-
 /**
- * Opens a URL in a new browser tab, routing auth callbacks to the handler.
+ * Opens a URL in a new browser tab, ignoring retired account callbacks.
  */
 function openIncomingUrl(
   url: string,
   windowLayoutService: WindowLayoutService,
   logger: Logger,
-  authCallbackHandler: AuthCallbackHandler | null,
-  queueAuthCallbackUrl?: (url: string) => void,
 ): void {
   if (isAuthCallbackUrl(url)) {
-    logger.debug('[Main] Received auth callback URL');
-    if (authCallbackHandler) {
-      handleAuthCallbackUrl(url, logger, authCallbackHandler);
-    } else {
-      queueAuthCallbackUrl?.(url);
-    }
+    // Ignore callbacks from versions that supported managed accounts.
     return;
   }
   if (!windowLayoutService.getBaseWindow()) return;
@@ -1504,34 +1442,18 @@ function openIncomingUrl(
 
 /**
  * Sets up event handlers for opening URLs from OS events.
- * Returns a function to register the auth callback handler once AuthService is ready.
+ * Legacy account callbacks are ignored.
  */
 function setupUrlHandlers(
   windowLayoutService: WindowLayoutService,
   logger: Logger,
-): (handler: AuthCallbackHandler) => void {
-  let authCallbackHandler: AuthCallbackHandler | null = null;
-  const pendingAuthCallbackUrls: string[] = [];
-  const queueAuthCallbackUrl = (url: string) => {
-    if (pendingAuthCallbackUrls.length >= MAX_QUEUED_AUTH_CALLBACK_URLS) {
-      pendingAuthCallbackUrls.shift();
-    }
-    pendingAuthCallbackUrls.push(url);
-    logger.debug('[Main] Queued auth callback URL until handler is ready');
-  };
-
+): void {
   // Use registerStartupUrlHandler (installed in index.ts) to get all
   // open-url events, including those queued before main.ts runs.
   registerStartupUrlHandler((url) => {
     logger.debug(`[Main] open-url event received: ${describeIncomingUrl(url)}`);
     if (isOpenableUrl(url)) {
-      openIncomingUrl(
-        url,
-        windowLayoutService,
-        logger,
-        authCallbackHandler,
-        queueAuthCallbackUrl,
-      );
+      openIncomingUrl(url, windowLayoutService, logger);
     }
   });
 
@@ -1542,23 +1464,9 @@ function setupUrlHandlers(
     );
     const urls = extractUrlsFromArgs(argv);
     for (const url of urls) {
-      openIncomingUrl(
-        url,
-        windowLayoutService,
-        logger,
-        authCallbackHandler,
-        queueAuthCallbackUrl,
-      );
+      openIncomingUrl(url, windowLayoutService, logger);
     }
   });
-
-  return (handler: AuthCallbackHandler) => {
-    authCallbackHandler = handler;
-    const urls = pendingAuthCallbackUrls.splice(0);
-    for (const url of urls) {
-      handleAuthCallbackUrl(url, logger, handler);
-    }
-  };
 }
 
 /**
@@ -1570,7 +1478,6 @@ function handleCommandLineUrls(
   argv: string[],
   windowLayoutService: WindowLayoutService,
   logger: Logger,
-  authCallbackHandler: AuthCallbackHandler | null,
 ): void {
   const urls = extractUrlsFromArgs(argv);
   if (urls.length > 0) {
@@ -1580,16 +1487,11 @@ function handleCommandLineUrls(
         .join(', ')}`,
     );
     // Open the first URL immediately, others will be queued
-    openIncomingUrl(urls[0], windowLayoutService, logger, authCallbackHandler);
+    openIncomingUrl(urls[0], windowLayoutService, logger);
     // Open remaining URLs after a short delay to ensure the first one is processed
     for (let i = 1; i < urls.length; i++) {
       setTimeout(() => {
-        openIncomingUrl(
-          urls[i],
-          windowLayoutService,
-          logger,
-          authCallbackHandler,
-        );
+        openIncomingUrl(urls[i], windowLayoutService, logger);
       }, i * 100);
     }
   }

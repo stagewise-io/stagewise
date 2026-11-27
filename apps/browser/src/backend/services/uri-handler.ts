@@ -2,13 +2,11 @@ import { app } from 'electron';
 import type { Logger } from './logger';
 import path from 'node:path';
 import { DisposableService } from './disposable';
-import { AUTH_CALLBACK_SCHEME } from './auth/callback-scheme';
 
 const STABLE_APP_SCHEME = 'stagewise';
 
 /**
- * Service responsible for registering the app as the default protocol client for auth callback URLs.
- * This enables the OS to route configured callback scheme URLs to this app.
+ * Registers the app as the default protocol client for workspace deep links.
  *
  * Note: URL handling is done in main.ts via setupUrlHandlers() and handleCommandLineUrls().
  * This service only sets up the protocol registration.
@@ -29,9 +27,7 @@ export class URIHandlerService extends DisposableService {
   }
 
   private async initialize(): Promise<void> {
-    const schemes = Array.from(
-      new Set([STABLE_APP_SCHEME, AUTH_CALLBACK_SCHEME]),
-    );
+    const schemes = [STABLE_APP_SCHEME];
 
     for (const scheme of schemes) {
       const registered = app.setAsDefaultProtocolClient(scheme);
