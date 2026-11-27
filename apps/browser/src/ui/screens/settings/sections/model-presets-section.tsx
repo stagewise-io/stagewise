@@ -551,11 +551,13 @@ function useModelListItems(
           entry.modelId,
           entry.providerInstanceId,
         );
-        const valid = isModelEntryValid(
-          preferences,
-          entry.modelId,
-          entry.providerInstanceId,
-        );
+        const valid =
+          !isStagewiseRoutedSelection(preferences, entry.providerInstanceId) &&
+          isModelEntryValid(
+            preferences,
+            entry.modelId,
+            entry.providerInstanceId,
+          );
         const key = modelKey(entry);
         const selectorEntry = entry.providerInstanceId
           ? entries.find(
@@ -778,8 +780,7 @@ function UtilityModelList({
 
   const modelEntries = preferences.agent.utilityModels[task] ?? [];
 
-  // Stagewise Inference is excluded from the selectable entries while
-  // the user is not signed in.
+  // Retired managed inference is never selectable.
   const selectionPreferences = useMemo(
     () => withoutStagewiseInference(preferences),
     [preferences],
@@ -789,31 +790,21 @@ function UtilityModelList({
     [selectionPreferences],
   );
 
-  // While signed out, entries routed through Stagewise Inference cannot
-  // run and are hidden from the list. They stay stored (nothing is
-  // deleted) and reappear once the user signs in. Implicit Stagewise
-  // routes (entries saved without an instance ID) are matched via
-  // `isStagewiseRoutedSelection` — `isModelEntryValid` alone would let
-  // another provider exposing the same model ID keep them visible.
+  // Keep retired routes stored but hidden. Invalid external entries remain
+  // visible so users can remove them or fix their provider configuration.
   const visibleEntries = useMemo(
     () =>
       modelEntries.filter(
         (entry) =>
-          !isStagewiseRoutedSelection(preferences, entry.providerInstanceId) &&
-          isModelEntryValid(
-            selectionPreferences,
-            entry.modelId,
-            entry.providerInstanceId,
-          ),
+          !isStagewiseRoutedSelection(preferences, entry.providerInstanceId),
       ),
-    [modelEntries, preferences, selectionPreferences],
+    [modelEntries, preferences],
   );
 
   const handleChange = useCallback(
     (next: UtilityModelEntry[]) => {
       // Merge the entries hidden above back into their original positions
-      // so saving while signed out never removes the stored Stagewise
-      // Inference entries — and never reorders the configured fallback
+      // so editing never removes the stored retired entries or changes fallback
       // order either. Each hidden entry is anchored before the first
       // surviving entry that followed it in the original list; entries
       // the user removed were visible and are intentionally dropped.
@@ -892,7 +883,8 @@ function PresetCard({
       )
     : undefined;
   const mainValid = mainModel
-    ? isModelEntryValid(
+    ? !isStagewiseRoutedSelection(preferences, mainModel.providerInstanceId) &&
+      isModelEntryValid(
         preferences,
         mainModel.modelId,
         mainModel.providerInstanceId,
@@ -902,8 +894,10 @@ function PresetCard({
   const fallbackCount = preset.models.length - 1;
   const validFallbacks = preset.models
     .slice(1)
-    .filter((f) =>
-      isModelEntryValid(preferences, f.modelId, f.providerInstanceId),
+    .filter(
+      (f) =>
+        !isStagewiseRoutedSelection(preferences, f.providerInstanceId) &&
+        isModelEntryValid(preferences, f.modelId, f.providerInstanceId),
     ).length;
 
   const thinkingLabel = preset.models.find((m) => m.thinkingOverride?.enabled)

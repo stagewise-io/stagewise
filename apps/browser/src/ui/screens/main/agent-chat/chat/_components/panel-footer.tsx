@@ -75,6 +75,7 @@ import { getAvailableModel } from '@shared/available-models';
 import {
   DEFAULT_INSTANCE_ID,
   findModelSelectorEntry,
+  isStagewiseRoutedSelection,
   getSelectableModelEntries,
   withoutStagewiseInference,
 } from '@shared/provider-instance-helpers';
@@ -83,6 +84,7 @@ import type { Content } from '@tiptap/core';
 import {
   markdownToTipTapContent,
   enrichTipTapContent,
+  getDraftAttachments,
 } from '@ui/utils/tiptap-content-utils';
 import { getCurrentDraftAnswers } from './footer-status-card/user-question-section';
 import { getWorkspaceDisplayLabel } from '@ui/utils/workspace-display';
@@ -872,6 +874,20 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
         .length === 0,
     [preferences],
   );
+  const activeModelId = useKartonState((s) =>
+    openAgent ? s.agents.instances[openAgent]?.state.activeModelId : null,
+  );
+  const activeProviderInstanceId = useKartonState((s) =>
+    openAgent
+      ? s.agents.instances[openAgent]?.state.activeProviderInstanceId
+      : null,
+  );
+  const needsModelSelection =
+    !!openAgent &&
+    isStagewiseRoutedSelection(
+      preferences,
+      activeProviderInstanceId ?? undefined,
+    );
   const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
 
   const canSendMessageRef = useRef(effectiveCanSendMessage);
@@ -1027,14 +1043,33 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
 
   const handleSubmit = useCallback(async () => {
     if (!canSendMessageRef.current) return;
-    if (needsInferenceSetup) {
-      await openSettings({ section: 'models-providers' });
-      return;
+    // Answers are staged atomically and must not be blocked by inference setup.
+    if (pendingQuestionIdRef.current === null) {
+      if (needsInferenceSetup) {
+        await openSettings({ section: 'models-providers' });
+        return;
+      }
+      if (needsModelSelection) {
+        toast({
+          id: 'select-external-model',
+          title: 'Select a model',
+          message:
+            'Choose a model from the model picker before sending this message.',
+          type: 'error',
+          actions: [],
+        });
+        return;
+      }
     }
 
     // Read frequently-changing values from refs at call time
     const currentLocalInputState = localInputStateRef.current;
-    const currentFileAttachments = fileAttachmentsRef.current;
+    // Metadata is path-based. Rebuild it from persisted editor nodes after a
+    // settings round trip, merging live metadata to preserve original names.
+    const currentFileAttachments = getDraftAttachments(
+      currentLocalInputState,
+      fileAttachmentsRef.current,
+    );
 
     // Snapshot pending question ID — used for the atomic interrupt call below.
     const currentPendingQuestionId = pendingQuestionIdRef.current;
@@ -1188,6 +1223,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
     }
   }, [
     needsInferenceSetup,
+    needsModelSelection,
     openSettings,
     sendUserMessage,
     openAgent,
@@ -1232,14 +1268,6 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
     openAgent
       ? s.agents.instances[openAgent]?.state.contextWindowSize
       : undefined,
-  );
-  const activeModelId = useKartonState((s) =>
-    openAgent ? s.agents.instances[openAgent]?.state.activeModelId : null,
-  );
-  const activeProviderInstanceId = useKartonState((s) =>
-    openAgent
-      ? s.agents.instances[openAgent]?.state.activeProviderInstanceId
-      : null,
   );
   const isExternalAgentRuntime = preferences.providerInstances.some(
     (instance) =>
@@ -1948,6 +1976,11 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
             Configure inference
           </Button>
         </div>
+      )}
+      {!needsInferenceSetup && needsModelSelection && !hasPendingQuestion && (
+        <p role="status" className="px-2 py-1 text-muted-foreground text-sm">
+          This chat used retired inference. Select a model below to continue.
+        </p>
       )}
       <MessageAttachmentsProvider elements={[]} attachments={fileAttachments}>
         <div
