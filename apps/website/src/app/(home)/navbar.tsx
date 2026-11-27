@@ -4,11 +4,11 @@ import { LogoCombo } from '@stagewise/stage-ui/components/logo-combo';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import { MenuIcon, XIcon, ChevronDown } from 'lucide-react';
+import { MenuIcon, XIcon } from 'lucide-react';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { IconDownload4FillDuo18 } from '@stagewise/icons';
 
 function NavDownloadButton() {
@@ -96,76 +96,8 @@ function NavLink({
   );
 }
 
-function ResourcesDropdown() {
-  const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const show = useCallback(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    setOpen(true);
-  }, []);
-
-  const hide = useCallback(() => {
-    timeoutRef.current = setTimeout(() => setOpen(false), 150);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
-
-  const pathname = usePathname();
-  const isResourcesActive = ['/docs', '/news'].some((p) =>
-    p.startsWith('/') ? pathname.startsWith(p) : false,
-  );
-
-  return (
-    <div className="relative" onMouseEnter={show} onMouseLeave={hide}>
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-controls="resources-dropdown"
-        className={cn(
-          buttonVariants({ variant: 'ghost', size: 'md' }),
-          'pointer-events-auto inline-flex items-center justify-start gap-1',
-          isResourcesActive && 'font-semibold text-foreground',
-        )}
-      >
-        Resources
-        <ChevronDown
-          className={cn('size-3.5 transition-transform', open && 'rotate-180')}
-        />
-      </button>
-      {open && (
-        <div
-          id="resources-dropdown"
-          ref={contentRef}
-          className={cn(
-            'absolute top-full left-1/2 z-50 mt-1 -translate-x-1/2',
-            'flex min-w-36 flex-col gap-1 rounded-lg border border-border-subtle bg-background p-1.5 shadow-lg',
-          )}
-        >
-          <NavLink href="https://docs.stagewise.io">Docs</NavLink>
-          <NavLink href="/news">News</NavLink>
-          <NavLink href="https://company.stagewise.io">Company</NavLink>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
-  const [resourcesOpen, setResourcesOpen] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen) setResourcesOpen(false);
-  }, [isOpen]);
 
   return (
     <div className="fixed top-0 left-0 z-[60] flex w-full justify-center bg-background/40 backdrop-blur-lg">
@@ -180,7 +112,9 @@ export function Navbar() {
           {/* Desktop nav links — centered */}
           <div className="pointer-events-none absolute inset-x-0 hidden items-center justify-center sm:flex">
             <div className="pointer-events-auto flex items-center">
-              <ResourcesDropdown />
+              <NavLink href="https://docs.stagewise.io">Docs</NavLink>
+              <NavLink href="/news">News</NavLink>
+              <NavLink href="https://company.stagewise.io">Company</NavLink>
             </div>
           </div>
 
@@ -219,46 +153,21 @@ export function Navbar() {
               id="mobile-navigation-menu"
               className="relative z-50 -mx-4 flex flex-col items-start gap-1 border-border border-t border-b bg-background px-4 pb-3 shadow-lg sm:hidden"
             >
-              <button
-                type="button"
-                onClick={() => setResourcesOpen((v) => !v)}
-                aria-expanded={resourcesOpen}
-                aria-controls="mobile-resources"
-                className={cn(
-                  buttonVariants({ variant: 'ghost', size: 'md' }),
-                  'inline-flex w-full items-center justify-between',
-                )}
+              <NavLink
+                href="https://docs.stagewise.io"
+                onClick={() => setIsOpen(false)}
               >
-                Resources
-                <ChevronDown
-                  className={cn(
-                    'size-3.5 transition-transform',
-                    resourcesOpen && 'rotate-180',
-                  )}
-                />
-              </button>
-              {resourcesOpen && (
-                <div
-                  id="mobile-resources"
-                  className="flex w-full flex-col gap-1 border-border/50 border-l pl-4"
-                >
-                  <NavLink
-                    href="https://docs.stagewise.io"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Docs
-                  </NavLink>
-                  <NavLink href="/news" onClick={() => setIsOpen(false)}>
-                    News
-                  </NavLink>
-                  <NavLink
-                    href="https://company.stagewise.io"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Company
-                  </NavLink>
-                </div>
-              )}
+                Docs
+              </NavLink>
+              <NavLink href="/news" onClick={() => setIsOpen(false)}>
+                News
+              </NavLink>
+              <NavLink
+                href="https://company.stagewise.io"
+                onClick={() => setIsOpen(false)}
+              >
+                Company
+              </NavLink>
             </div>
           </>
         )}
