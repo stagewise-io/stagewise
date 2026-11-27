@@ -1,6 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import { IconArrowRightFill18 } from '@stagewise/icons';
 import { getAllNewsPosts } from '@/lib/source';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { HeroSection } from './_components/hero-section';
@@ -77,30 +75,6 @@ export default function Home() {
 
         {/* Features */}
         <FeatureSection />
-
-        {/* Ready for your enterprise */}
-        <section className="relative z-10 w-full py-20 md:py-28">
-          <div className="flex justify-center">
-            <ScrollReveal>
-              <div className="max-w-3xl pt-8 text-center">
-                <h2 className="mb-4 font-medium text-2xl tracking-tight md:text-3xl">
-                  Ready for your enterprise
-                </h2>
-                <p className="text-base text-muted-foreground">
-                  Run stagewise the way your team needs — on your
-                  infrastructure, with your models, under your control.
-                </p>
-                <Link
-                  href="/enterprise"
-                  className="mt-2 inline-flex items-center gap-2 text-base text-primary-foreground hover:text-hover-derived active:text-active-derived"
-                >
-                  stagewise for Enterprises
-                  <IconArrowRightFill18 className="inline size-4" />
-                </Link>
-              </div>
-            </ScrollReveal>
-          </div>
-        </section>
 
         {/* News section */}
         <NewsSection posts={posts} />
