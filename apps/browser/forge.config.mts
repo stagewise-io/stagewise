@@ -12,7 +12,7 @@ import { SquirrelInstallerNameFixPlugin } from './etc/forge-plugins/squirrel-ins
 import { getWindowsSignConfig } from './etc/windows/windowsSign';
 import path from 'node:path';
 import fs from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import * as buildConstants from './build-constants';
 
 // Get Windows signing configuration (returns undefined if not configured)
@@ -150,8 +150,8 @@ const pruneNonPlatformPrebuilds = (
  *
  * Using NuGet guarantees the correct architecture and the latest patch-level
  * DLLs without depending on a VS installation being present on the machine.
- * The .nupkg is a plain ZIP; extraction uses PowerShell's Expand-Archive
- * (built into every Windows install).
+ * The .nupkg is a plain ZIP; extraction uses .NET's ZipFile directly to
+ * avoid loading an incompatible PowerShell Archive module from PSModulePath.
  *
  * No-op on non-Windows platforms.
  */
@@ -207,8 +207,18 @@ const copyVcRedist = (
       );
 
       fs.mkdirSync(extractDir, { recursive: true });
-      execSync(
-        `powershell -NoProfile -Command "Expand-Archive -Path '${nupkgPath}' -DestinationPath '${extractDir}' -Force"`,
+      execFileSync(
+        'powershell.exe',
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          "$ErrorActionPreference = 'Stop'; " +
+            'Add-Type -AssemblyName System.IO.Compression.FileSystem; ' +
+            '[System.IO.Compression.ZipFile]::ExtractToDirectory(' +
+            `'${nupkgPath.replaceAll("'", "''")}', ` +
+            `'${extractDir.replaceAll("'", "''")}')`,
+        ],
         { stdio: 'inherit' },
       );
 

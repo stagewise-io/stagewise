@@ -110,9 +110,7 @@ describe('sanitizeEnv', () => {
         'NODE_ENV',
         'BUILD_MODE',
         'POSTHOG_HOST',
-        'STAGEWISE_CONSOLE_URL',
         'API_URL',
-        'LLM_PROXY_URL',
         'UPDATE_SERVER_ORIGIN',
         'SUPABASE_URL',
       ];

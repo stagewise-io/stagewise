@@ -184,7 +184,8 @@ jobs:
           - os: macos-26-intel
             platform: darwin-x64
             arch: x64
-          - os: ubuntu-latest
+          # electron-installer-redhat requires RPM < 4.20's build layout.
+          - os: ubuntu-24.04
             platform: linux-x64
             arch: x64
           - os: windows-latest
@@ -200,11 +201,6 @@ jobs:
       VITE_POSTHOG_API_KEY: ${{ secrets.VITE_POSTHOG_API_KEY }}
       SUPABASE_URL: ${{ vars.SUPABASE_URL }}
       SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
-      API_URL: ${{ vars.API_URL }}
-      VITE_API_URL: ${{ vars.VITE_API_URL }}
-      STAGEWISE_CONSOLE_URL: ${{ vars.STAGEWISE_CONSOLE_URL }}
-      VITE_STAGEWISE_CONSOLE_URL: ${{ vars.VITE_STAGEWISE_CONSOLE_URL }}
-      LLM_PROXY_URL: ${{ vars.LLM_PROXY_URL }}
       VITE_DISABLE_TELEMETRY: ${{ vars.VITE_DISABLE_TELEMETRY }}
 
     steps:

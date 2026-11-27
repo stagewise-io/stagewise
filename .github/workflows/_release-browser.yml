@@ -139,7 +139,8 @@ jobs:
           - os: macos-26-intel
             arch: x64
             artifact: stagewise-macos-x64
-          - os: ubuntu-latest
+          # electron-installer-redhat requires RPM < 4.20's build layout.
+          - os: ubuntu-24.04
             arch: x64
             artifact: stagewise-linux-x64
           - os: windows-latest  # explicit arch label; avoids breakage if GitHub adds ARM runners under windows-latest
@@ -155,16 +156,10 @@ jobs:
       NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
       POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
       VITE_POSTHOG_API_KEY: ${{ secrets.VITE_POSTHOG_API_KEY }}
-      API_URL: ${{ vars.API_URL }}
-      VITE_API_URL: ${{ vars.VITE_API_URL }}
-      STAGEWISE_CONSOLE_URL: ${{ vars.STAGEWISE_CONSOLE_URL }}
-      VITE_STAGEWISE_CONSOLE_URL: ${{ vars.VITE_STAGEWISE_CONSOLE_URL }}
-      LLM_PROXY_URL: ${{ vars.LLM_PROXY_URL }}
       VITE_DISABLE_TELEMETRY: ${{ vars.VITE_DISABLE_TELEMETRY }}
       SUPABASE_URL: ${{ vars.SUPABASE_URL }}
       SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
       UPDATE_SERVER_ORIGIN: ${{ vars.UPDATE_SERVER_ORIGIN }}
-      VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
       # PostHog CLI (source map upload during packaging)
       POSTHOG_CLI_API_KEY: ${{ secrets.POSTHOG_CLI_API_KEY }}
       POSTHOG_CLI_PROJECT_ID: ${{ secrets.POSTHOG_CLI_PROJECT_ID }}
